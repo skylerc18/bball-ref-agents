@@ -1,0 +1,1 @@
+(Live Agent) Basketball AI Ref, an agent-powered multi-angle referee. This is a Live Review Room, in which agents analyze various angles of a single play to determine a verdict and highlight supporting and dissenting clips to the user in an interruptible referee-like manner. 

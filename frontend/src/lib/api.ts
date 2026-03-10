@@ -11,7 +11,7 @@ function fakeDelay(ms: number): Promise<void> {
 }
 
 export async function createReviewSession(): Promise<CreateSessionResponse> {
-  await fakeDelay(200);
+  // await fakeDelay(200);
 
   return {
     session: {

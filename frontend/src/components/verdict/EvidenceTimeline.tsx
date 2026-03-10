@@ -5,7 +5,7 @@ import type { EvidenceItem } from "@/types/domain";
 
 type Props = {
   evidence: EvidenceItem[];
-  onJumpToTime: (timeSec: number) => void;
+  onJumpToTime?: (timeSec: number) => void;
 };
 
 export function EvidenceTimeline({ evidence, onJumpToTime }: Props) {
@@ -26,13 +26,15 @@ export function EvidenceTimeline({ evidence, onJumpToTime }: Props) {
                   </p>
                   <p className="mt-1 text-sm text-court-300">{item.reason}</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onJumpToTime(item.timestampSec)}
-                  className="rounded-md border border-whistle-500/60 px-2 py-1 text-xs text-whistle-400 hover:bg-whistle-500/10"
-                >
-                  Jump
-                </button>
+                {onJumpToTime ? (
+                  <button
+                    type="button"
+                    onClick={() => onJumpToTime(item.timestampSec)}
+                    className="rounded-md border border-whistle-500/60 px-2 py-1 text-xs text-whistle-400 hover:bg-whistle-500/10"
+                  >
+                    Jump
+                  </button>
+                ) : null}
               </div>
             </li>
           ))}

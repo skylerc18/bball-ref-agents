@@ -1,65 +1,123 @@
+import { API_BASE_URL } from "@/lib/constants";
 import type {
   AnalyzeSessionResponse,
   CreateSessionResponse,
   UploadAnglesRequest,
   UploadAnglesResponse,
 } from "@/types/api";
-import type { Verdict } from "@/types/domain";
+import type { ReviewSession, Verdict } from "@/types/domain";
 
-function fakeDelay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+type BackendSession = {
+  id: string;
+  created_at: string;
+  status: ReviewSession["status"];
+};
+
+type BackendEvidenceItem = {
+  id: string;
+  angle_id: string;
+  timestamp_sec: number;
+  confidence: number;
+  reason: string;
+};
+
+type BackendVerdict = {
+  level: Verdict["level"];
+  confidence: number;
+  summary: string;
+  rule_reference: string;
+  evidence: BackendEvidenceItem[];
+};
+
+type BackendAnalyzeResponse = {
+  session_id: string;
+  verdict: BackendVerdict;
+};
+
+async function parseError(response: Response): Promise<Error> {
+  try {
+    const body = (await response.json()) as { detail?: string };
+    return new Error(body.detail ?? `Request failed (${response.status})`);
+  } catch {
+    return new Error(`Request failed (${response.status})`);
+  }
+}
+
+function mapSession(session: BackendSession): ReviewSession {
+  return {
+    id: session.id,
+    createdAt: session.created_at,
+    status: session.status,
+  };
+}
+
+function mapVerdict(verdict: BackendVerdict): Verdict {
+  return {
+    level: verdict.level,
+    confidence: verdict.confidence,
+    summary: verdict.summary,
+    ruleReference: verdict.rule_reference,
+    evidence: verdict.evidence.map((item) => ({
+      id: item.id,
+      angleId: item.angle_id,
+      timestampSec: item.timestamp_sec,
+      confidence: item.confidence,
+      reason: item.reason,
+    })),
+  };
 }
 
 export async function createReviewSession(): Promise<CreateSessionResponse> {
-  // await fakeDelay(200);
+  const response = await fetch(`${API_BASE_URL}/api/sessions`, {
+    method: "POST",
+  });
 
+  if (!response.ok) {
+    throw await parseError(response);
+  }
+
+  const payload = (await response.json()) as BackendSession;
   return {
-    session: {
-      id: `session_${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      status: "idle",
-    },
+    session: mapSession(payload),
   };
 }
 
 export async function uploadAngles(payload: UploadAnglesRequest): Promise<UploadAnglesResponse> {
-  void payload;
-  await fakeDelay(500);
+  const formData = new FormData();
+  payload.angles.forEach((angle) => {
+    formData.append("files", angle.file, angle.fileName);
+  });
+
+  const response = await fetch(`${API_BASE_URL}/api/sessions/${payload.sessionId}/angles`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw await parseError(response);
+  }
+
+  const body = (await response.json()) as { accepted: boolean; uploaded_count: number; uploadedCount?: number };
 
   return {
-    accepted: true,
-    uploadedCount: payload.angles.length,
+    accepted: body.accepted,
+    uploadedCount: body.uploadedCount ?? body.uploaded_count,
   };
-}
-
-function buildMockVerdict(sessionId: string): AnalyzeSessionResponse {
-  const verdict: Verdict = {
-    level: "upheld",
-    confidence: 0.84,
-    summary: "Defender established legal guarding position before contact; offensive player initiated displacement.",
-    ruleReference: "NFHS Rule 4-23",
-    evidence: [
-      {
-        id: `${sessionId}_ev_1`,
-        angleId: "angle-1",
-        timestampSec: 3.2,
-        confidence: 0.87,
-        reason: "Lead foot set outside restricted space before torso collision.",
-      },
-      {
-        id: `${sessionId}_ev_2`,
-        angleId: "angle-2",
-        timestampSec: 3.4,
-        confidence: 0.81,
-        reason: "Secondary angle confirms no downward arm contact from defender.",
-      },
-    ],
-  };
-
-  return { sessionId, verdict };
 }
 
 export async function analyzeSession(sessionId: string): Promise<AnalyzeSessionResponse> {
-  await fakeDelay(1000);
-  return buildMockVerdict(sessionId);
+  const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/analyze`, {
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    throw await parseError(response);
+  }
+
+  const payload = (await response.json()) as BackendAnalyzeResponse;
+
+  return {
+    sessionId: payload.session_id,
+    verdict: mapVerdict(payload.verdict),
+  };
 }

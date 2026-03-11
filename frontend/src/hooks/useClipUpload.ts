@@ -8,6 +8,7 @@ function toAngle(index: number, file: File): CameraAngle {
   return {
     id: `angle-${index + 1}`,
     label: `Angle ${index + 1}`,
+    file,
     fileName: file.name,
     fileSize: file.size,
     srcUrl: URL.createObjectURL(file),

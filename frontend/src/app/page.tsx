@@ -16,7 +16,7 @@ export default function Page() {
   const router = useRouter();
   const { angles, setFromFiles, clear } = useClipUpload();
   const { session, ensureSession, setSession } = useSession();
-  const { isConnected } = useWebSocket(false);
+  const { isConnected } = useWebSocket(session?.id ?? null, false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -4,17 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import { createWsConnection } from "@/lib/ws";
 import type { WsServerMessage } from "@/types/api";
 
-export function useWebSocket(enabled: boolean) {
+export function useWebSocket(sessionId: string | null, enabled: boolean) {
   const socketRef = useRef<WebSocket | null>(null);
   const [messages, setMessages] = useState<WsServerMessage[]>([]);
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || !sessionId) {
       return;
     }
 
-    const socket = createWsConnection((message) => {
+    const socket = createWsConnection(sessionId, (message) => {
       setMessages((prev) => [...prev, message]);
     });
 
@@ -29,7 +29,7 @@ export function useWebSocket(enabled: boolean) {
       socketRef.current = null;
       setIsConnected(false);
     };
-  }, [enabled]);
+  }, [enabled, sessionId]);
 
   return {
     isConnected,

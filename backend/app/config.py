@@ -10,7 +10,7 @@ from app.utils.secrets import load_secret
 class Settings(BaseSettings):
     app_name: str = "AI Basketball Ref Backend"
     api_prefix: str = "/api"
-    cors_origins: list[str] = ["http://localhost:3000"]
+    cors_origins: list[str] = ["http://localhost:3000","https://bball-ai-ref-frontend-794727813456.europe-west1.run.app"]
     upload_dir: Path = Path("backend/data/uploads")
     google_api_key: str | None = None
     gcp_project_id: str | None = None

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import sys
@@ -14,6 +15,7 @@ if str(AGENTS_ROOT) not in sys.path:
 
 from google.adk.runners import InMemoryRunner
 from google.genai import types
+from models.settings import AgentModelConfig
 from schemas.reports import FinalDecision
 from schemas.session import ClipInput, SessionInput
 from workflows.session_workflow import build_agent_tree, build_session_prompt
@@ -50,23 +52,67 @@ def _fallback_decision(raw_text: str) -> FinalDecision:
     )
 
 
-class AgentsClient:
-    async def analyze(self, session_id: str, angles: list[AngleMetadata]) -> AnalyzeSessionResponse:
-        session_input = SessionInput(
-            session_id=session_id,
-            clips=[
-                ClipInput(
-                    clip_id=angle.id,
-                    angle_label=angle.label,
-                    storage_path=angle.storage_path,
-                )
-                for angle in angles
-            ],
-        )
-        prompt = build_session_prompt(session_input)
-        agent = build_agent_tree()
-        runner = InMemoryRunner(agent=agent, app_name="bball_ref_agents")
+def _is_retryable_model_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    markers = (
+        "resource_exhausted",
+        "quota exceeded",
+        "429",
+        "rate limit",
+        "too many requests",
+        "model not found",
+        "unsupported model",
+        "permission denied",
+        "tool '",
+        "available tools: transfer_to_agent",
+        "not found",
+    )
+    return any(marker in text for marker in markers)
 
+
+def _retry_after_seconds(exc: Exception) -> float:
+    text = str(exc).lower()
+    # Example provider text: "Please retry in 23.754321379s."
+    match = re.search(r"retry in\s+([0-9]+(?:\.[0-9]+)?)s", text)
+    if not match:
+        return 1.5
+    return max(0.5, min(float(match.group(1)), 30.0))
+
+
+def _model_attempts() -> list[AgentModelConfig]:
+    # Rotate model load across roles, then fall back to all-flash.
+    return [
+        AgentModelConfig(
+            orchestrator_model="gemini-2.5-flash",
+            specialist_model="gemini-2.5-flash",
+            crew_chief_model="gemini-2.5-pro",
+        ),
+        AgentModelConfig(
+            orchestrator_model="gemini-2.5-flash",
+            specialist_model="gemini-2.5-pro",
+            crew_chief_model="gemini-2.5-flash",
+        ),
+        AgentModelConfig(
+            orchestrator_model="gemini-2.5-pro",
+            specialist_model="gemini-2.5-flash",
+            crew_chief_model="gemini-2.5-flash",
+        ),
+        AgentModelConfig(
+            orchestrator_model="gemini-2.5-flash",
+            specialist_model="gemini-2.5-flash",
+            crew_chief_model="gemini-2.5-flash",
+        ),
+    ]
+
+
+class AgentsClient:
+    async def _run_agent_attempt(
+        self,
+        prompt: str,
+        model_config: AgentModelConfig,
+    ) -> tuple[str | None, dict | None]:
+        agent = build_agent_tree(model_config=model_config)
+        runner = InMemoryRunner(agent=agent, app_name="bball_ref_agents")
         session = await runner.session_service.create_session(app_name=runner.app_name, user_id="backend")
         user_message = types.Content(role="user", parts=[types.Part.from_text(text=prompt)])
 
@@ -97,6 +143,41 @@ class AgentsClient:
                     last_text = merged_text
         finally:
             await runner.close()
+        return last_text, final_decision_payload
+
+    async def analyze(self, session_id: str, angles: list[AngleMetadata]) -> AnalyzeSessionResponse:
+        session_input = SessionInput(
+            session_id=session_id,
+            clips=[
+                ClipInput(
+                    clip_id=angle.id,
+                    angle_label=angle.label,
+                    storage_path=angle.storage_path,
+                )
+                for angle in angles
+            ],
+        )
+        prompt = build_session_prompt(session_input)
+        last_text: str | None = None
+        final_decision_payload: dict | None = None
+        last_exc: Exception | None = None
+        for attempt in _model_attempts():
+            try:
+                last_text, final_decision_payload = await self._run_agent_attempt(
+                    prompt=prompt,
+                    model_config=attempt,
+                )
+                break
+            except Exception as exc:
+                last_exc = exc
+                if not _is_retryable_model_error(exc):
+                    raise
+                await asyncio.sleep(_retry_after_seconds(exc))
+                continue
+
+        if last_text is None and last_exc is not None:
+            # Degrade gracefully instead of bubbling a 500 for recoverable model/tool failures.
+            last_text = f"Agent analysis fallback: {last_exc}"
 
         if not last_text:
             raise RuntimeError("Agent API returned no decision content")

@@ -37,6 +37,19 @@ def _normalize_level(level: str) -> VerdictLevel:
     return VerdictLevel.inconclusive
 
 
+def _fallback_decision(raw_text: str) -> FinalDecision:
+    summary = re.sub(r"\s+", " ", raw_text).strip()
+    if len(summary) > 280:
+        summary = f"{summary[:277]}..."
+    return FinalDecision(
+        level=VerdictLevel.inconclusive.value,
+        confidence=0.35,
+        rule_reference="N/A",
+        summary=summary or "Agent response was not in the expected structured format.",
+        rationale=[],
+    )
+
+
 class AgentsClient:
     async def analyze(self, session_id: str, angles: list[AngleMetadata]) -> AnalyzeSessionResponse:
         session_input = SessionInput(
@@ -58,12 +71,25 @@ class AgentsClient:
         user_message = types.Content(role="user", parts=[types.Part.from_text(text=prompt)])
 
         last_text: str | None = None
+        final_decision_payload: dict | None = None
         try:
             async for event in runner.run_async(
                 user_id=session.user_id,
                 session_id=session.id,
                 new_message=user_message,
             ):
+                actions = getattr(event, "actions", None)
+                state_delta = getattr(actions, "state_delta", None) if actions else None
+                if isinstance(state_delta, dict):
+                    payload = state_delta.get("final_decision")
+                    if isinstance(payload, dict):
+                        final_decision_payload = payload
+                    elif isinstance(payload, str):
+                        try:
+                            final_decision_payload = json.loads(_extract_json_object(payload))
+                        except Exception:
+                            pass
+
                 if not event.content or not event.content.parts:
                     continue
                 merged_text = "\n".join(part.text for part in event.content.parts if part.text)
@@ -75,7 +101,13 @@ class AgentsClient:
         if not last_text:
             raise RuntimeError("Agent API returned no decision content")
 
-        decision = FinalDecision.model_validate(json.loads(_extract_json_object(last_text)))
+        if final_decision_payload is not None:
+            decision = FinalDecision.model_validate(final_decision_payload)
+        else:
+            try:
+                decision = FinalDecision.model_validate(json.loads(_extract_json_object(last_text)))
+            except Exception:
+                decision = _fallback_decision(last_text)
         verdict = Verdict(
             level=_normalize_level(decision.level),
             confidence=decision.confidence,

@@ -4,7 +4,8 @@ FROM node:20-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json* frontend/npm-shrinkwrap.json* frontend/pnpm-lock.yaml* ./
-RUN if [ -f package-lock.json ]; then npm ci; elif [ -f npm-shrinkwrap.json ]; then npm ci; elif [ -f pnpm-lock.yaml ]; then yarn global add pnpm && pnpm i; else npm i; fi
+COPY install_deps.sh ./
+RUN chmod +x install_deps.sh && ./install_deps.sh
 
 # 2. Rebuild the source code only when needed
 FROM node:20-alpine AS builder

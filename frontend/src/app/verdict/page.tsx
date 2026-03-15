@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Header } from "@/components/common/Header";
@@ -10,7 +10,7 @@ import { useWebSocket } from "@/hooks/useWebSocket";
 import { analyzeSession } from "@/lib/api";
 import type { Verdict } from "@/types/domain";
 
-export default function VerdictPage() {
+function VerdictPageContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("sessionId");
 
@@ -92,5 +92,24 @@ export default function VerdictPage() {
         <EvidenceTimeline evidence={verdict?.evidence ?? []} />
       </div>
     </main>
+  );
+}
+
+function VerdictPageFallback() {
+  return (
+    <main className="min-h-screen bg-gradient-to-b from-court-950 via-court-900 to-court-950 text-white">
+      <Header />
+      <div className="mx-auto w-full max-w-7xl px-6 py-8">
+        <p className="rounded-md border border-court-700 bg-court-900/50 p-3 text-sm text-court-300">Loading verdict...</p>
+      </div>
+    </main>
+  );
+}
+
+export default function VerdictPage() {
+  return (
+    <Suspense fallback={<VerdictPageFallback />}>
+      <VerdictPageContent />
+    </Suspense>
   );
 }

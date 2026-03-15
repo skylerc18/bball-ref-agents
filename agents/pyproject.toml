@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bball-ref-agents"
+version = "0.1.0"
+description = "Agent layer for AI basketball referee session analysis"
+requires-python = ">=3.11"
+dependencies = [
+  "google-adk>=1.2.1",
+  "pydantic>=2.10.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.0",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["agents*", "workflows*", "schemas*", "models*", "utils*", "prompts*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

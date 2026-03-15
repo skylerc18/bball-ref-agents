@@ -5,11 +5,15 @@ steps:
         "build",
         "-f",
         "frontend/Dockerfile",
+        "--build-arg",
+        "NEXT_PUBLIC_API_BASE_URL=$_NEXT_PUBLIC_API_BASE_URL",
         "-t",
         "europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/bball-ai-ref-frontend:$COMMIT_SHA",
         ".",
       ]
 images:
   - "europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/bball-ai-ref-frontend:$COMMIT_SHA"
+substitutions:
+  _NEXT_PUBLIC_API_BASE_URL: "https://bball-ai-ref-agents-f4ayqerdwq-ew.a.run.app"
 options:
   logging: CLOUD_LOGGING_ONLY

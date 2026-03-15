@@ -1,0 +1,9 @@
+Metadata-Version: 2.1
+Name: bball-ref-agents
+Version: 0.1.0
+Summary: Agent layer for AI basketball referee session analysis
+Requires-Python: >=3.11
+Requires-Dist: google-adk>=1.2.1
+Requires-Dist: pydantic>=2.10.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.3.0; extra == "dev"

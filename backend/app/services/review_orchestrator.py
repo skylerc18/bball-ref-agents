@@ -39,7 +39,18 @@ class ReviewOrchestrator:
                 },
             )
 
-        result = await self._agents_client.analyze(session_id=session_id, angles=session.angles)
+        try:
+            result = await self._agents_client.analyze(session_id=session_id, angles=session.angles)
+        except Exception:
+            self._repo.set_status(session_id, SessionStatus.error)
+            await self._ws_manager.broadcast(
+                session_id,
+                {
+                    "type": "session.status",
+                    "payload": {"session_id": session_id, "status": SessionStatus.error},
+                },
+            )
+            raise
 
         self._repo.set_verdict(session_id, result.verdict)
         self._repo.set_status(session_id, SessionStatus.complete)

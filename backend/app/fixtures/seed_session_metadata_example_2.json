@@ -1,0 +1,53 @@
+{
+  "scenario": "example_2",
+  "metadata": {
+    "game": {
+      "game_id": "example_2_lal_den",
+      "game_date": "2026-03-14",
+      "home_team": "LAL",
+      "away_team": "DEN",
+      "period": "Q3",
+      "period_time_remaining": "04:16",
+      "score_context": "DEN 70 - LAL 79",
+      "possession_team": "LAL"
+    },
+    "call": {
+      "call_type": "Shooting foul",
+      "ruling_on_floor": "Defensive shooting foul on Cameron Johnson",
+      "whistle_time": "00:07.00 clip time",
+      "review_trigger": "Call challenged by DEN"
+    },
+    "players_on_court": [
+      {"player_id": "lal_luke_kennard", "display_name": "Luke Kennard", "team": "LAL", "jersey_number": "10"},
+      {"player_id": "lal_luka_doncic", "display_name": "Luka Doncic", "team": "LAL", "jersey_number": "77"},
+      {"player_id": "lal_austin_reaves", "display_name": "Austin Reaves", "team": "LAL", "jersey_number": "15"},
+      {"player_id": "lal_deandre_ayton", "display_name": "Deandre Ayton", "team": "LAL", "jersey_number": "5"},
+      {"player_id": "lal_rui_hachimura", "display_name": "Rui Hachimura", "team": "LAL", "jersey_number": "28"},
+      {"player_id": "den_spencer_jones", "display_name": "Spencer Jones", "team": "DEN", "jersey_number": "21"},
+      {"player_id": "den_tim_hardaway_jr", "display_name": "Tim Hardaway Jr", "team": "DEN", "jersey_number": "10"},
+      {"player_id": "den_christian_braun", "display_name": "Christian Braun", "team": "DEN", "jersey_number": "0"},
+      {"player_id": "den_nikola_jokic", "display_name": "Nikola Jokic", "team": "DEN", "jersey_number": "15"},
+      {"player_id": "den_cameron_johnson", "display_name": "Cameron Johnson", "team": "DEN", "jersey_number": "23"}
+    ],
+    "involved_players": [
+      {
+        "player_id": "lal_luka_doncic",
+        "display_name": "Luka Doncic",
+        "team": "LAL",
+        "role_in_play": "Offensive player with the ball"
+      },
+      {
+        "player_id": "den_cameron_johnson",
+        "display_name": "Cameron Johnson",
+        "team": "DEN",
+        "role_in_play": "Primary defender"
+      }
+    ],
+    "players_involved_in_play": ["lal_luka_doncic", "den_cameron_johnson"],
+    "shot_clock": "14",
+    "period": "Q3",
+    "game_clock": "04:16",
+    "possession_team": "LAL",
+    "score_context": "DEN 70 - LAL 79"
+  }
+}

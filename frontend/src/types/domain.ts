@@ -1,7 +1,7 @@
 export type CameraAngle = {
   id: string;
   label: string;
-  file: File;
+  file?: File;
   fileName: string;
   fileSize: number;
   durationSec?: number;

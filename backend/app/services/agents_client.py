@@ -4,6 +4,7 @@ import asyncio
 import json
 import re
 import sys
+from typing import Any
 from pathlib import Path
 
 from app.schemas.session import AngleMetadata
@@ -15,9 +16,10 @@ if str(AGENTS_ROOT) not in sys.path:
 
 from google.adk.runners import InMemoryRunner
 from google.genai import types
+from agents.crew_chief import build_crew_chief_agent
 from models.settings import AgentModelConfig
 from schemas.reports import FinalDecision
-from schemas.session import ClipInput, SessionInput
+from schemas.session import ClipInput, SessionInput, SessionMetadata
 from workflows.session_workflow import build_agent_tree, build_session_prompt
 
 
@@ -32,22 +34,76 @@ def _extract_json_object(text: str) -> str:
     raise ValueError("No JSON object found in agent response")
 
 
+def _is_final_decision_shape(payload: object) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    required = {"level", "confidence", "rule_reference", "summary", "rationale"}
+    return required.issubset(payload.keys())
+
+
+def _normalize_text_key(text: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[^A-Za-z0-9 ]+", " ", text)).strip().lower()
+
+
+def _extract_name_like_phrases(text: str) -> set[str]:
+    pattern = r"\b[A-Z][A-Za-z'\.-]+\s+[A-Z][A-Za-z'\.-]+\b"
+    return {match.group(0) for match in re.finditer(pattern, text)}
+
+
+def _metadata_guardrail_violations(decision: FinalDecision, metadata: SessionMetadata) -> list[str]:
+    combined_text = " ".join([decision.summary, *decision.rationale])
+    lowered = combined_text.lower()
+    violations: list[str] = []
+
+    banned_phrases = (
+        "player in white jersey",
+        "player in black jersey",
+        "offensive player",
+        "defensive player",
+        "defensive team",
+        "attacking team",
+    )
+    for phrase in banned_phrases:
+        if phrase in lowered:
+            violations.append(f"banned_generic_reference:{phrase}")
+
+    allowed_names = {
+        _normalize_text_key(player.display_name)
+        for player in [*metadata.players_on_court, *metadata.involved_players]
+        if getattr(player, "display_name", None)
+    }
+    if allowed_names:
+        ignore_name_candidates = {
+            "out of",
+            "rule reference",
+            "instant replay",
+            "coach challenge",
+        }
+        candidate_names = {_normalize_text_key(name) for name in _extract_name_like_phrases(combined_text)}
+        for candidate in candidate_names:
+            if not candidate or candidate in ignore_name_candidates:
+                continue
+            if candidate not in allowed_names:
+                violations.append(f"unknown_name:{candidate}")
+
+    involved_names = [
+        _normalize_text_key(player.display_name)
+        for player in metadata.involved_players
+        if player.display_name
+    ]
+    if involved_names:
+        for involved_name in involved_names:
+            if involved_name and involved_name not in _normalize_text_key(combined_text):
+                violations.append(f"missing_involved_player:{involved_name}")
+
+    return violations
+
+
 def _normalize_level(level: str) -> VerdictLevel:
     normalized = level.strip().lower()
     if normalized in {VerdictLevel.upheld.value, VerdictLevel.overruled.value, VerdictLevel.inconclusive.value}:
         return VerdictLevel(normalized)
     return VerdictLevel.inconclusive
-
-
-def _fallback_decision(raw_text: str) -> FinalDecision:
-    summary = re.sub(r"\s+", " ", raw_text).strip()
-    return FinalDecision(
-        level=VerdictLevel.inconclusive.value,
-        confidence=0.35,
-        rule_reference="N/A",
-        summary=summary or "Agent response was not in the expected structured format.",
-        rationale=[],
-    )
 
 
 def _parse_timestamp_seconds(text: str) -> float | None:
@@ -166,7 +222,69 @@ def _model_attempts() -> list[AgentModelConfig]:
     ]
 
 
+def _metadata_from_override(metadata_override: dict[str, Any] | None) -> SessionMetadata:
+    if metadata_override is None:
+        return SessionMetadata()
+    try:
+        return SessionMetadata.model_validate(metadata_override)
+    except Exception:
+        return SessionMetadata()
+
+
 class AgentsClient:
+    async def _run_recovery_crew_chief(
+        self,
+        prompt: str,
+        prior_text: str | None,
+        model_config: AgentModelConfig,
+        constraint_note: str | None = None,
+    ) -> tuple[str | None, dict | None]:
+        recovery_agent = build_crew_chief_agent(model_config=model_config)
+        runner = InMemoryRunner(agent=recovery_agent, app_name="bball_ref_agents_recovery")
+        session = await runner.session_service.create_session(app_name=runner.app_name, user_id="backend")
+        recovery_prompt = (
+            "Return exactly one JSON object with keys: level, confidence, rule_reference, summary, rationale.\n"
+            "Do not include markdown or any extra text.\n\n"
+            "Original session prompt:\n"
+            f"{prompt}\n\n"
+            "Recent model output (may be incomplete/non-final):\n"
+            f"{prior_text or 'none'}\n"
+        )
+        if constraint_note:
+            recovery_prompt += f"\nAdditional hard constraints:\n{constraint_note}\n"
+        user_message = types.Content(role="user", parts=[types.Part.from_text(text=recovery_prompt)])
+
+        last_text: str | None = None
+        final_decision_payload: dict | None = None
+        try:
+            async for event in runner.run_async(
+                user_id=session.user_id,
+                session_id=session.id,
+                new_message=user_message,
+            ):
+                actions = getattr(event, "actions", None)
+                state_delta = getattr(actions, "state_delta", None) if actions else None
+                if isinstance(state_delta, dict):
+                    payload = state_delta.get("final_decision")
+                    if isinstance(payload, dict) and _is_final_decision_shape(payload):
+                        final_decision_payload = payload
+                    elif isinstance(payload, str):
+                        try:
+                            parsed = json.loads(_extract_json_object(payload))
+                            if _is_final_decision_shape(parsed):
+                                final_decision_payload = parsed
+                        except Exception:
+                            pass
+
+                if not event.content or not event.content.parts:
+                    continue
+                merged_text = "\n".join(part.text for part in event.content.parts if part.text)
+                if merged_text:
+                    last_text = merged_text
+        finally:
+            await runner.close()
+        return last_text, final_decision_payload
+
     async def _run_agent_attempt(
         self,
         prompt: str,
@@ -178,6 +296,8 @@ class AgentsClient:
         user_message = types.Content(role="user", parts=[types.Part.from_text(text=prompt)])
 
         last_text: str | None = None
+        json_text_candidate: str | None = None
+        running_text_buffer: list[str] = []
         final_decision_payload: dict | None = None
         try:
             async for event in runner.run_async(
@@ -202,11 +322,30 @@ class AgentsClient:
                 merged_text = "\n".join(part.text for part in event.content.parts if part.text)
                 if merged_text:
                     last_text = merged_text
+                    running_text_buffer.append(merged_text)
+                    if json_text_candidate is None:
+                        try:
+                            parsed = json.loads(_extract_json_object(merged_text))
+                            if _is_final_decision_shape(parsed):
+                                json_text_candidate = json.dumps(parsed)
+                        except Exception:
+                            try:
+                                parsed = json.loads(_extract_json_object("\n".join(running_text_buffer)))
+                                if _is_final_decision_shape(parsed):
+                                    json_text_candidate = json.dumps(parsed)
+                            except Exception:
+                                pass
         finally:
             await runner.close()
-        return last_text, final_decision_payload
+        return json_text_candidate or last_text, final_decision_payload
 
-    async def analyze(self, session_id: str, angles: list[AngleMetadata]) -> AnalyzeSessionResponse:
+    async def analyze(
+        self,
+        session_id: str,
+        angles: list[AngleMetadata],
+        metadata_override: dict[str, Any] | None = None,
+    ) -> AnalyzeSessionResponse:
+        seeded_metadata = _metadata_from_override(metadata_override=metadata_override)
         session_input = SessionInput(
             session_id=session_id,
             clips=[
@@ -217,17 +356,20 @@ class AgentsClient:
                 )
                 for angle in angles
             ],
+            metadata=seeded_metadata,
         )
         prompt = build_session_prompt(session_input)
         last_text: str | None = None
         final_decision_payload: dict | None = None
         last_exc: Exception | None = None
+        used_attempt: AgentModelConfig | None = None
         for attempt in _model_attempts():
             try:
                 last_text, final_decision_payload = await self._run_agent_attempt(
                     prompt=prompt,
                     model_config=attempt,
                 )
+                used_attempt = attempt
                 break
             except Exception as exc:
                 last_exc = exc
@@ -248,8 +390,58 @@ class AgentsClient:
         else:
             try:
                 decision = FinalDecision.model_validate(json.loads(_extract_json_object(last_text)))
-            except Exception:
-                decision = _fallback_decision(last_text)
+            except Exception as exc:
+                recovery_text, recovery_payload = await self._run_recovery_crew_chief(
+                    prompt=prompt,
+                    prior_text=last_text,
+                    model_config=used_attempt or _model_attempts()[0],
+                )
+                if recovery_payload is not None:
+                    decision = FinalDecision.model_validate(recovery_payload)
+                else:
+                    try:
+                        decision = FinalDecision.model_validate(
+                            json.loads(_extract_json_object(recovery_text or ""))
+                        )
+                    except Exception:
+                        snippet = re.sub(r"\s+", " ", last_text).strip()
+                        if len(snippet) > 300:
+                            snippet = f"{snippet[:300]}..."
+                        raise RuntimeError(
+                            "Crew chief response was not valid FinalDecision JSON; "
+                            f"raw response snippet: {snippet}"
+                        ) from exc
+
+        violations = _metadata_guardrail_violations(decision=decision, metadata=seeded_metadata)
+        if violations:
+            allowed_names = ", ".join(player.display_name for player in seeded_metadata.players_on_court if player.display_name)
+            involved_names = ", ".join(
+                player.display_name for player in seeded_metadata.involved_players if player.display_name
+            )
+            note = (
+                "Use only these player names: "
+                f"{allowed_names or 'none provided'}.\n"
+                "You must explicitly mention these involved players: "
+                f"{involved_names or 'none provided'}.\n"
+                f"Fix these violations: {', '.join(violations[:8])}."
+            )
+            recovery_text, recovery_payload = await self._run_recovery_crew_chief(
+                prompt=prompt,
+                prior_text=json.dumps(decision.model_dump(mode='json')),
+                model_config=used_attempt or _model_attempts()[0],
+                constraint_note=note,
+            )
+            if recovery_payload is not None:
+                decision = FinalDecision.model_validate(recovery_payload)
+            else:
+                decision = FinalDecision.model_validate(json.loads(_extract_json_object(recovery_text or "")))
+
+            post_violations = _metadata_guardrail_violations(decision=decision, metadata=seeded_metadata)
+            if post_violations:
+                raise RuntimeError(
+                    "Crew chief decision violated metadata grounding constraints: "
+                    + ", ".join(post_violations[:8])
+                )
         verdict = Verdict(
             level=_normalize_level(decision.level),
             confidence=decision.confidence,

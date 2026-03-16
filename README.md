@@ -1,5 +1,17 @@
 (Live Agent) Basketball AI Ref, an agent-powered multi-angle referee. This is a Live Review Room, in which agents analyze various angles of a single play to determine a verdict and highlight supporting and dissenting clips to the user in an interruptible referee-like manner. 
 
+## Local Development
+
+`cd` into `backend`
+
+`export BBREF_GOOGLE_API_KEY="your_gemini_api_key"`
+`python -m pip install -r backend/requirements.txt`
+`python -m pip install -e ./agents`
+`python -m uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload`
+
+In a new terminal session, `cd` into `backend`
+`npm run dev`
+
 ## Backend Deploy Env
 
 Use `deploy/backend.env.yaml` for Cloud Run env settings (including CORS and Secret Manager metadata), then apply with:

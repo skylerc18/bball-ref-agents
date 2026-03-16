@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/common/Header";
 import { MultiAngleUploader } from "@/components/upload/MultiAngleUploader";
@@ -10,16 +10,45 @@ import { useClipUpload } from "@/hooks/useClipUpload";
 import { useSession } from "@/hooks/useSession";
 import { useSyncedPlayback } from "@/hooks/useSyncedPlayback";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { uploadAngles } from "@/lib/api";
+import { createSessionFromExample, listExamples, uploadAngles } from "@/lib/api";
+import type { ExampleSummary } from "@/types/api";
 
 export default function Page() {
   const router = useRouter();
-  const { angles, setFromFiles, clear } = useClipUpload();
+  const { angles, setFromFiles, setFromRemote, clear } = useClipUpload();
   const { session, ensureSession, setSession } = useSession();
   const { isConnected } = useWebSocket(session?.id ?? null, false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [examples, setExamples] = useState<ExampleSummary[]>([]);
+  const [isLoadingExamples, setIsLoadingExamples] = useState(false);
+  const [selectedExampleId, setSelectedExampleId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const load = async () => {
+      setIsLoadingExamples(true);
+      try {
+        const res = await listExamples();
+        if (isMounted) {
+          setExamples(res.examples);
+        }
+      } catch {
+        if (isMounted) {
+          setError("Unable to load built-in examples.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingExamples(false);
+        }
+      }
+    };
+    void load();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const angleIds = useMemo(() => angles.map((angle) => angle.id), [angles]);
 
@@ -29,8 +58,32 @@ export default function Page() {
   const onClearAll = () => {
     clear();
     setError(null);
+    setSelectedExampleId(null);
     if (session) {
       setSession({ ...session, status: "idle" });
+    }
+  };
+
+  const onFilesSelected = (files: FileList | null) => {
+    setSelectedExampleId(null);
+    if (session) {
+      setSession(null);
+    }
+    setFromFiles(files);
+  };
+
+  const onSelectExample = async (example: ExampleSummary) => {
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      const res = await createSessionFromExample(example.exampleId);
+      setSession(res.session);
+      setSelectedExampleId(example.exampleId);
+      setFromRemote(example.clips);
+    } catch {
+      setError("Unable to load example session.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -45,10 +98,24 @@ export default function Page() {
     setIsSubmitting(true);
 
     try {
-      const activeSession = await ensureSession();
-      setSession({ ...activeSession, status: "uploading" });
+      const hasUploadedFiles = angles.some((angle) => Boolean(angle.file));
+      let activeSession = session;
 
-      await uploadAngles({ sessionId: activeSession.id, angles });
+      if (selectedExampleId) {
+        if (!activeSession) {
+          throw new Error("Example session is missing.");
+        }
+      } else {
+        activeSession = await ensureSession();
+        setSession({ ...activeSession, status: "uploading" });
+        if (hasUploadedFiles) {
+          await uploadAngles({ sessionId: activeSession.id, angles });
+        }
+      }
+
+      if (!activeSession) {
+        throw new Error("Session unavailable.");
+      }
       setSession({ ...activeSession, status: "processing" });
 
       router.push(`/verdict?sessionId=${encodeURIComponent(activeSession.id)}`);
@@ -66,7 +133,37 @@ export default function Page() {
       <Header />
 
       <div className="mx-auto w-full max-w-7xl space-y-4 px-6 py-8">
-        <MultiAngleUploader angles={angles} onFilesSelected={setFromFiles} onClear={onClearAll} />
+        <section className="rounded-2xl border border-court-700/70 bg-court-900/60 p-4 shadow-panel">
+          <div className="mb-3">
+            <h2 className="text-lg font-semibold text-white">Built-In Example Clips</h2>
+            <p className="text-sm text-court-300">Pick an example to preload clips and metadata without uploading.</p>
+          </div>
+          {isLoadingExamples ? (
+            <p className="text-sm text-court-300">Loading examples...</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              {examples.map((example) => (
+                <button
+                  key={example.exampleId}
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => onSelectExample(example)}
+                  className={`rounded-lg border p-3 text-left transition ${
+                    selectedExampleId === example.exampleId
+                      ? "border-whistle-500 bg-court-800"
+                      : "border-court-600 bg-court-950/40 hover:border-court-400"
+                  }`}
+                >
+                  <p className="text-sm font-semibold text-white">{example.title}</p>
+                  <p className="mt-1 text-xs text-court-300">{example.description ?? "No description"}</p>
+                  <p className="mt-2 text-xs text-court-400">{example.clipCount} clips</p>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <MultiAngleUploader angles={angles} onFilesSelected={onFilesSelected} onClear={onClearAll} />
 
         <PlaybackControls
           state={syncState}

@@ -4,6 +4,7 @@ from pathlib import Path
 from threading import RLock
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from typing import Any
 
 from app.schemas.session import AngleMetadata, SessionStatus
 from app.schemas.verdict import Verdict
@@ -26,6 +27,7 @@ class SessionRecord:
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     status: SessionStatus = SessionStatus.idle
     angles: list[AngleMetadata] = field(default_factory=list)
+    context_metadata: dict[str, Any] | None = None
     verdict: Verdict | None = None
     turn_counter: int = 0
     turns: dict[str, TurnRecord] = field(default_factory=dict)
@@ -49,17 +51,29 @@ class SessionRepository:
                     created_at TEXT NOT NULL,
                     status TEXT NOT NULL,
                     angles_json TEXT NOT NULL,
+                    context_metadata_json TEXT,
                     verdict_json TEXT,
                     turn_counter INTEGER NOT NULL DEFAULT 0,
                     turns_json TEXT NOT NULL
                 )
                 """
             )
+            columns = {
+                row["name"]
+                for row in self._conn.execute("PRAGMA table_info(sessions)").fetchall()
+            }
+            if "context_metadata_json" not in columns:
+                self._conn.execute("ALTER TABLE sessions ADD COLUMN context_metadata_json TEXT")
 
     def _row_to_record(self, row: sqlite3.Row) -> SessionRecord:
         angles_data = json.loads(row["angles_json"]) if row["angles_json"] else []
         turns_data = json.loads(row["turns_json"]) if row["turns_json"] else {}
         verdict_data = json.loads(row["verdict_json"]) if row["verdict_json"] else None
+        context_metadata = (
+            json.loads(row["context_metadata_json"])
+            if "context_metadata_json" in row.keys() and row["context_metadata_json"]
+            else None
+        )
 
         turns: dict[str, TurnRecord] = {}
         for turn_id, value in turns_data.items():
@@ -80,6 +94,7 @@ class SessionRepository:
             created_at=datetime.fromisoformat(row["created_at"]),
             status=SessionStatus(row["status"]),
             angles=[AngleMetadata.model_validate(item) for item in angles_data],
+            context_metadata=context_metadata if isinstance(context_metadata, dict) else None,
             verdict=Verdict.model_validate(verdict_data) if verdict_data else None,
             turn_counter=int(row["turn_counter"]),
             turns=turns,
@@ -101,14 +116,15 @@ class SessionRepository:
             self._conn.execute(
                 """
                 INSERT OR REPLACE INTO sessions
-                (id, created_at, status, angles_json, verdict_json, turn_counter, turns_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (id, created_at, status, angles_json, context_metadata_json, verdict_json, turn_counter, turns_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     record.id,
                     record.created_at.isoformat(),
                     record.status.value,
                     json.dumps([item.model_dump(mode="json") for item in record.angles]),
+                    json.dumps(record.context_metadata) if record.context_metadata is not None else None,
                     json.dumps(record.verdict.model_dump(mode="json")) if record.verdict else None,
                     record.turn_counter,
                     json.dumps(turns_json),
@@ -153,6 +169,15 @@ class SessionRepository:
             if record is None:
                 raise KeyError(session_id)
             record.verdict = verdict
+            self._save_record(record)
+            return record
+
+    def set_context_metadata(self, session_id: str, metadata: dict[str, Any] | None) -> SessionRecord:
+        with self._lock:
+            record = self._get_unlocked(session_id)
+            if record is None:
+                raise KeyError(session_id)
+            record.context_metadata = metadata
             self._save_record(record)
             return record
 

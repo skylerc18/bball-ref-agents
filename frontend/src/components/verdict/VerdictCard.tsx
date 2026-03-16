@@ -30,7 +30,6 @@ export function VerdictCard({ verdict, isProcessing }: Props) {
             {verdict.level}
           </span>
           <p className="text-sm text-court-200">{verdict.summary}</p>
-          <p className="text-sm text-court-300">Rule: {verdict.ruleReference}</p>
           <p className="text-sm text-court-300">Confidence: {(verdict.confidence * 100).toFixed(0)}%</p>
         </div>
       ) : null}

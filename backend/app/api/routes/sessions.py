@@ -1,10 +1,21 @@
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
 
-from app.api.deps import repo, review_orchestrator, session_service, upload_service
-from app.schemas.session import SessionCreateResponse, SessionReadResponse, SessionStatus, UploadAnglesResponse
+from app.api.deps import example_service, repo, review_orchestrator, session_service, upload_service
+from app.schemas.session import (
+    ListExamplesResponse,
+    SessionCreateResponse,
+    SessionReadResponse,
+    SessionStatus,
+    UploadAnglesResponse,
+)
 from app.schemas.verdict import AnalyzeSessionResponse
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
+
+
+@router.get("/examples", response_model=ListExamplesResponse)
+async def list_examples() -> ListExamplesResponse:
+    return ListExamplesResponse(examples=example_service.list_examples())
 
 
 @router.post("", response_model=SessionCreateResponse, status_code=status.HTTP_201_CREATED)
@@ -48,3 +59,15 @@ async def analyze_session(session_id: str) -> AnalyzeSessionResponse:
 
     result = await review_orchestrator.analyze(session_id=session_id)
     return result
+
+
+@router.post("/from-example/{example_id}", response_model=SessionReadResponse, status_code=status.HTTP_201_CREATED)
+async def create_session_from_example(example_id: str) -> SessionReadResponse:
+    record = session_service.create_session()
+    hydrated = example_service.apply_example_to_session(session_id=record.id, example_id=example_id)
+    return SessionReadResponse(
+        id=hydrated.id,
+        created_at=hydrated.created_at,
+        status=hydrated.status,
+        angles=hydrated.angles,
+    )

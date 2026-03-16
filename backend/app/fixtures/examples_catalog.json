@@ -1,0 +1,79 @@
+[
+  {
+    "example_id": "example_1",
+    "title": "Celtics at Cavaliers - Out Of Bounds",
+    "description": "Cleveland home court, Q4 late-game out-of-bounds review.",
+    "tags": ["out_of_bounds", "late_game"],
+    "metadata_path": "backend/app/fixtures/seed_session_metadata_example_1.json",
+    "clips": [
+      {
+        "id": "angle-1",
+        "label": "Angle 1",
+        "path": "media/examples/example_1/clip_1.mp4"
+      },
+      {
+        "id": "angle-2",
+        "label": "Angle 2",
+        "path": "media/examples/example_1/clip_2.mp4"
+      }
+    ]
+  },
+  {
+    "example_id": "example_2",
+    "title": "Nuggets at Lakers - Shooting Foul",
+    "description": "Lakers home court, Q3 shooting-foul review involving Doncic and Johnson.",
+    "tags": ["shooting_foul", "half_court_action"],
+    "metadata_path": "backend/app/fixtures/seed_session_metadata_example_2.json",
+    "clips": [
+      {
+        "id": "angle-1",
+        "label": "Angle 1",
+        "path": "media/examples/example_2/clip_1.mp4"
+      },
+      {
+        "id": "angle-2",
+        "label": "Angle 2",
+        "path": "media/examples/example_2/clip_2.mp4"
+      },
+      {
+        "id": "angle-3",
+        "label": "Angle 3",
+        "path": "media/examples/example_2/clip_3.mp4"
+      },
+      {
+        "id": "angle-4",
+        "label": "Angle 4",
+        "path": "media/examples/example_2/clip_4.mp4"
+      }
+    ]
+  },
+  {
+    "example_id": "example_3",
+    "title": "Nuggets at Spurs - Away-From-Play Foul",
+    "description": "San Antonio home court, Q3 away-from-the-play foul review.",
+    "tags": ["away_from_play_foul", "off_ball_contact"],
+    "metadata_path": "backend/app/fixtures/seed_session_metadata_example_3.json",
+    "clips": [
+      {
+        "id": "angle-1",
+        "label": "Angle 1",
+        "path": "media/examples/example_3/clip_1.mp4"
+      },
+      {
+        "id": "angle-2",
+        "label": "Angle 2",
+        "path": "media/examples/example_3/clip_2.mp4"
+      },
+      {
+        "id": "angle-3",
+        "label": "Angle 3",
+        "path": "media/examples/example_3/clip_3.mp4"
+      },
+      {
+        "id": "angle-4",
+        "label": "Angle 4",
+        "path": "media/examples/example_3/clip_4.mp4"
+      }
+    ]
+  }
+]

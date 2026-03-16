@@ -1,0 +1,114 @@
+[
+  {
+    "rule_number": 1,
+    "section": "Court Boundaries and Markings",
+    "comment_text": "Boundary rulings should prioritize clear line contact and reliable camera perspective; avoid overconfident edge calls from distorted angles.",
+    "examples": ["baseline foot-on-line", "sideline ball contact"],
+    "applies_to": ["out_of_bounds"],
+    "priority": "medium"
+  },
+  {
+    "rule_number": 2,
+    "section": "Crew Administration",
+    "comment_text": "When evidence is mixed, state what is known, what is uncertain, and keep the on-court call unless replay standard is met.",
+    "examples": ["inconclusive replay", "partial occlusion"],
+    "applies_to": ["all"],
+    "priority": "high"
+  },
+  {
+    "rule_number": 3,
+    "section": "Lineup and Player Identity",
+    "comment_text": "Use on-court lineup context to resolve likely player identity when jersey view is limited.",
+    "examples": ["partially blocked jersey", "same-number ambiguity across teams"],
+    "applies_to": ["all"],
+    "priority": "medium"
+  },
+  {
+    "rule_number": 4,
+    "section": "Legal Position Definitions",
+    "comment_text": "For contact decisions, anchor language to legal guarding position, control, and shooting motion definitions before declaring foul type.",
+    "examples": ["block/charge", "shooting motion timing"],
+    "applies_to": ["shooting_foul", "offensive_foul", "block_charge"],
+    "priority": "high"
+  },
+  {
+    "rule_number": 5,
+    "section": "Clock Context",
+    "comment_text": "Reference period and game clock context when timing influences penalty administration or continuation.",
+    "examples": ["end-of-period contact", "late-game foul management"],
+    "applies_to": ["foul", "timing"],
+    "priority": "low"
+  },
+  {
+    "rule_number": 6,
+    "section": "Live/Dead Ball Transitions",
+    "comment_text": "Identify whether contact occurred on a live ball versus dead-ball interval; this can change whether play is reviewable or penalized as away-from-play.",
+    "examples": ["contact after whistle", "contact before throw-in release"],
+    "applies_to": ["away_from_play_foul", "technical"],
+    "priority": "high"
+  },
+  {
+    "rule_number": 7,
+    "section": "Shot Clock Interaction",
+    "comment_text": "When whistle timing and shot clock reset are disputed, separate foul determination from reset determination and state both clearly.",
+    "examples": ["deflection then whistle", "team-control reset scenarios"],
+    "applies_to": ["foul", "out_of_bounds", "shot_clock"],
+    "priority": "medium"
+  },
+  {
+    "rule_number": 8,
+    "section": "Last Touch Analysis",
+    "comment_text": "Last-touch rulings should focus on the final visible contact point immediately before the ball becomes out of bounds.",
+    "examples": ["deflection off fingertip", "simultaneous contest near sideline"],
+    "applies_to": ["out_of_bounds"],
+    "priority": "high"
+  },
+  {
+    "rule_number": 9,
+    "section": "Free Throw Administration",
+    "comment_text": "After confirming foul type, verify whether penalty state leads to free throws, side-out, or no shots.",
+    "examples": ["shooting foul awards", "team foul penalty"],
+    "applies_to": ["shooting_foul", "personal_foul"],
+    "priority": "medium"
+  },
+  {
+    "rule_number": 10,
+    "section": "Violation vs Foul Separation",
+    "comment_text": "Do not conflate violation evidence with contact evidence; determine violation status independently from foul contact status.",
+    "examples": ["travel before contact", "kicked ball before foul"],
+    "applies_to": ["foul", "violations"],
+    "priority": "medium"
+  },
+  {
+    "rule_number": 11,
+    "section": "Rim/Backboard Contact Scope",
+    "comment_text": "If basket interference/goaltending is not implicated, avoid introducing Rule 11 rationale into unrelated contact calls.",
+    "examples": ["drive contact with no rim touch", "rebound body contact only"],
+    "applies_to": ["foul"],
+    "priority": "low"
+  },
+  {
+    "rule_number": 12,
+    "section": "Illegal Contact Standards",
+    "comment_text": "For shooting and away-from-play fouls, describe who initiated illegal contact, where it occurred, and whether it affected rhythm/speed/balance/freedom of movement.",
+    "examples": ["defender hip check on drive", "hold/cutoff away from ball"],
+    "applies_to": ["shooting_foul", "away_from_play_foul", "personal_foul"],
+    "priority": "high"
+  },
+  {
+    "rule_number": 13,
+    "section": "Replay Threshold",
+    "comment_text": "Only overturn when video is clear and conclusive; otherwise confirm the floor call.",
+    "examples": ["insufficient angle", "frame-by-frame confirms opposite touch"],
+    "applies_to": ["out_of_bounds", "foul", "all_reviews"],
+    "priority": "high"
+  },
+  {
+    "rule_number": 14,
+    "section": "Challenge Procedure",
+    "comment_text": "When challenge context is present, mention challenge relevance only as procedure context; the ruling itself must still come from evidence and rule criteria.",
+    "examples": ["coach challenge successful", "challenge unsuccessful"],
+    "applies_to": ["out_of_bounds", "foul", "coach_challenge"],
+    "priority": "medium"
+  }
+]

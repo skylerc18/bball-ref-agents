@@ -19,6 +19,7 @@ logger = logging.getLogger("uvicorn.error")
 PCM_SAMPLE_RATE_HZ = 24000
 PCM_BYTES_PER_SAMPLE = 2
 TARGET_AUDIO_CHUNK_MS = 240
+TEXT_CHUNK_DELAY_SECONDS = 0.18
 
 
 class ReviewOrchestrator:
@@ -234,6 +235,8 @@ class ReviewOrchestrator:
                     },
                 )
                 self._repo.append_turn_transcript(session_id=session_id, turn_id=turn_id, text=chunk)
+                if index < len(chunks) - 1:
+                    await asyncio.sleep(TEXT_CHUNK_DELAY_SECONDS)
 
             try:
                 await emit_live_audio()
@@ -328,7 +331,11 @@ class ReviewOrchestrator:
         await self._publish_turn_state(session_id=session_id, turn_id=turn_id, state="deliberating")
 
         try:
-            result = await self._agents_client.analyze(session_id=session_id, angles=session.angles)
+            result = await self._agents_client.analyze(
+                session_id=session_id,
+                angles=session.angles,
+                metadata_override=session.context_metadata,
+            )
         except Exception:
             self._repo.set_status(session_id, SessionStatus.error)
             await self._ws_manager.broadcast(

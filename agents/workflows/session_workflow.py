@@ -1,9 +1,10 @@
 from agents.session_orchestrator import build_session_orchestrator_agent
+from models.settings import AgentModelConfig
 from schemas.session import SessionInput
 
 
-def build_agent_tree() -> object:
-    return build_session_orchestrator_agent()
+def build_agent_tree(model_config: AgentModelConfig | None = None) -> object:
+    return build_session_orchestrator_agent(model_config=model_config)
 
 
 def build_session_prompt(session: SessionInput) -> str:

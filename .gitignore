@@ -140,3 +140,6 @@ vite.config.ts.timestamp-*
 
 __pycache__/
 *.py[cod]
+.venv/
+
+backend/backend/data/uploads/

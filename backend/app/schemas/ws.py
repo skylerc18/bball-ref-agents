@@ -2,6 +2,7 @@ from typing import Literal, Union
 
 from pydantic import BaseModel
 
+from app.schemas.realtime import RealtimeMessage
 from app.schemas.session import SessionStatus
 from app.schemas.verdict import AnalyzeSessionResponse
 
@@ -31,4 +32,4 @@ class AnalysisDoneMessage(BaseModel):
     payload: AnalyzeSessionResponse
 
 
-WsMessage = Union[SessionStatusMessage, AnalysisProgressMessage, AnalysisDoneMessage]
+WsMessage = Union[SessionStatusMessage, AnalysisProgressMessage, AnalysisDoneMessage, RealtimeMessage]

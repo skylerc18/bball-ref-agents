@@ -19,7 +19,7 @@ export function MultiAngleUploader({ angles, onFilesSelected, onClear }: Props) 
     <section className="rounded-2xl border border-court-700/70 bg-court-900/60 p-4 shadow-panel">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-white">Upload Camera Angles - can you see this</h2>
+          <h2 className="text-lg font-semibold text-white">Upload Camera Angles</h2>
           <p className="text-sm text-court-300">Select up to {MAX_VIDEO_ANGLES} clips of the same play.</p>
         </div>
         <button

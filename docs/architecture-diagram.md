@@ -14,12 +14,12 @@ flowchart LR
     end
 
     subgraph BE[Backend - FastAPI / Python]
-        B1[/POST /api/sessions/]
-        B2[/POST /api/sessions/{id}/angles/]
-        B3[/POST /api/sessions/from-example/{example_id}/]
-        B4[/POST /api/sessions/{id}/analyze/]
-        B5[/GET /api/sessions/examples/]
-        B6[/WS /ws/sessions/{session_id}/]
+        B1["POST /api/sessions"]
+        B2["POST /api/sessions/:session_id/angles"]
+        B3["POST /api/sessions/from-example/:example_id"]
+        B4["POST /api/sessions/:session_id/analyze"]
+        B5["GET /api/sessions/examples"]
+        B6["WS /ws/sessions/:session_id"]
 
         B7[ReviewOrchestrator]
         B8[AgentsClient]

@@ -16,8 +16,36 @@ class PlayerContext(BaseModel):
     on_court: bool = True
 
 
+class InvolvedPlayer(BaseModel):
+    player_id: str
+    display_name: str
+    team: str | None = None
+    role_in_play: str | None = None
+
+
+class GameContext(BaseModel):
+    game_id: str | None = None
+    game_date: str | None = None
+    home_team: str | None = None
+    away_team: str | None = None
+    period: str | None = None
+    period_time_remaining: str | None = None
+    score_context: str | None = None
+    possession_team: str | None = None
+
+
+class CallContext(BaseModel):
+    call_type: str | None = None
+    ruling_on_floor: str | None = None
+    whistle_time: str | None = None
+    review_trigger: str | None = None
+
+
 class SessionMetadata(BaseModel):
+    game: GameContext = Field(default_factory=GameContext)
+    call: CallContext = Field(default_factory=CallContext)
     players_on_court: list[PlayerContext] = Field(default_factory=list)
+    involved_players: list[InvolvedPlayer] = Field(default_factory=list)
     players_involved_in_play: list[str] = Field(default_factory=list)
     game_clock: str | None = None
     shot_clock: str | None = None

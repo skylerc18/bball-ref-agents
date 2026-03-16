@@ -36,3 +36,22 @@ class SessionReadResponse(BaseModel):
 class UploadAnglesResponse(BaseModel):
     accepted: bool = True
     uploaded_count: int
+
+
+class ExampleClipSummary(BaseModel):
+    id: str
+    label: str
+    src_url: str
+
+
+class ExampleSummary(BaseModel):
+    example_id: str
+    title: str
+    description: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    clip_count: int
+    clips: list[ExampleClipSummary] = Field(default_factory=list)
+
+
+class ListExamplesResponse(BaseModel):
+    examples: list[ExampleSummary] = Field(default_factory=list)

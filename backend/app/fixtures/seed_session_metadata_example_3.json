@@ -1,0 +1,53 @@
+{
+  "scenario": "example_3",
+  "metadata": {
+    "game": {
+      "game_id": "example_3_den_sas",
+      "game_date": "2026-03-12",
+      "home_team": "SAS",
+      "away_team": "DEN",
+      "period": "Q3",
+      "period_time_remaining": "04:03",
+      "score_context": "DEN 78 - SAS 90",
+      "possession_team": "DEN"
+    },
+    "call": {
+      "call_type": "Away-from-play foul",
+      "ruling_on_floor": "Foul on Nikola Jokic (DEN)",
+      "whistle_time": "00:04.03 clip time",
+      "review_trigger": "Crew-initiated clarification"
+    },
+    "players_on_court": [
+      {"player_id": "den_bruce_brown", "display_name": "Bruce Brown", "team": "DEN", "jersey_number": "11"},
+      {"player_id": "den_nikola_jokic", "display_name": "Nikola Jokic", "team": "DEN", "jersey_number": "15"},
+      {"player_id": "den_jamal_murray", "display_name": "Jamal Murray", "team": "DEN", "jersey_number": "27"},
+      {"player_id": "den_spencer_jones", "display_name": "Spencer Jones", "team": "DEN", "jersey_number": "21"},
+      {"player_id": "den_tim_hardaway_jr", "display_name": "Tim Hardaway Jr", "team": "DEN", "jersey_number": "10"},
+      {"player_id": "sas_stephon_castle", "display_name": "Stephon Castle", "team": "SAS", "jersey_number": "5"},
+      {"player_id": "sas_keldon_johnson", "display_name": "Keldon Johnson", "team": "SAS", "jersey_number": "3"},
+      {"player_id": "sas_dylan_harper", "display_name": "Dylan Harper", "team": "SAS", "jersey_number": "2"},
+      {"player_id": "sas_harrison_barnes", "display_name": "Harrison Barnes", "team": "SAS", "jersey_number": "40"},
+      {"player_id": "sas_carter_bryant", "display_name": "Carter Bryant", "team": "SAS", "jersey_number": "11"}
+    ],
+    "involved_players": [
+      {
+        "player_id": "den_nikola_jokic",
+        "display_name": "Nikola Jokic",
+        "team": "DEN",
+        "role_in_play": "Player committing away-from-play foul"
+      },
+      {
+        "player_id": "sas_stephon_castle",
+        "display_name": "Stephon Castle",
+        "team": "SAS",
+        "role_in_play": "Player fouled away from the play"
+      }
+    ],
+    "players_involved_in_play": ["den_nikola_jokic", "sas_stephon_castle"],
+    "shot_clock": "13",
+    "period": "Q3",
+    "game_clock": "04:03",
+    "possession_team": "DEN",
+    "score_context": "DEN 78 - SAS 90"
+  }
+}

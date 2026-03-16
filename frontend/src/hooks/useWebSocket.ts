@@ -31,9 +31,34 @@ export function useWebSocket(sessionId: string | null, enabled: boolean) {
     };
   }, [enabled, sessionId]);
 
+  function sendMessage(message: unknown): void {
+    if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    socketRef.current.send(JSON.stringify(message));
+  }
+
+  function sendUserInterrupt(params: {
+    turnId: string;
+    utteranceId: string;
+    intent: "challenge" | "clarify" | "counterfactual" | "new_angle" | "other";
+    transcript: string;
+  }): void {
+    sendMessage({
+      type: "user.interrupt",
+      payload: {
+        turn_id: params.turnId,
+        utterance_id: params.utteranceId,
+        intent: params.intent,
+        transcript: params.transcript,
+      },
+    });
+  }
+
   return {
     isConnected,
     messages,
     socket: socketRef.current,
+    sendUserInterrupt,
   };
 }

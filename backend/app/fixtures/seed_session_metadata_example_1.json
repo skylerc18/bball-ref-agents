@@ -1,0 +1,53 @@
+{
+  "scenario": "example_1",
+  "metadata": {
+    "game": {
+      "game_id": "example_1_cle_bos",
+      "game_date": "2026-03-08",
+      "home_team": "CLE",
+      "away_team": "BOS",
+      "period": "Q4",
+      "period_time_remaining": "05:51",
+      "score_context": "CLE 86 - BOS 97",
+      "possession_team": "CLE"
+    },
+    "call": {
+      "call_type": "Out-of-bounds (last touch)",
+      "ruling_on_floor": "Out-of-bounds on Dennis Schröder (CLE), Boston ball",
+      "whistle_time": "00:03.83 clip time",
+      "review_trigger": "Crew-initiated clarification"
+    },
+    "players_on_court": [
+      {"player_id": "cle_dennis_schroder", "display_name": "Dennis Schröder", "team": "CLE", "jersey_number": 8},
+      {"player_id": "cle_james_harden", "display_name": "James Harden", "team": "CLE", "jersey_number": 1},
+      {"player_id": "cle_jaylon_tyson", "display_name": "Jaylon Tyson", "team": "CLE", "jersey_number": 20},
+      {"player_id": "cle_keon_ellis", "display_name": "Keon Ellis", "team": "CLE", "jersey_number": 14},
+      {"player_id": "cle_dean_wade", "display_name": "Dean Wade", "team": "CLE", "jersey_number": 32},
+      {"player_id": "bos_jayson_tatum", "display_name": "Jayson Tatum", "team": "BOS", "jersey_number": 0},
+      {"player_id": "bos_baylor_scheierman", "display_name": "Baylor Scheierman", "team": "BOS", "jersey_number": 55},
+      {"player_id": "bos_derrick_white", "display_name": "Derrick White", "team": "BOS", "jersey_number": 9},
+      {"player_id": "bos_payton_pritchard", "display_name": "Payton Pritchard", "team": "BOS", "jersey_number": 11},
+      {"player_id": "bos_neemias_queta", "display_name": "Neemias Queta", "team": "BOS", "jersey_number": 88}
+    ],
+    "involved_players": [
+      {
+        "player_id": "cle_dennis_schroder",
+        "display_name": "Dennis Schröder",
+        "team": "CLE",
+        "role_in_play": "Ball handler"
+      },
+      {
+        "player_id": "bos_neemias_queta",
+        "display_name": "Neemias Queta",
+        "team": "BOS",
+        "role_in_play": "Primary defender guarding ball"
+      }
+    ],
+    "players_involved_in_play": ["cle_dennis_schroder", "bos_neemias_queta"],
+    "shot_clock": "16",
+    "period": "Q4",
+    "game_clock": "05:51",
+    "possession_team": "CLE",
+    "score_context": "CLE 86 - BOS 97"
+  }
+}

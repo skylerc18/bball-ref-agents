@@ -33,10 +33,6 @@ function VerdictPageContent() {
   const [turns, setTurns] = useState<Record<string, TurnView>>({});
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [liveOnlyAudio, setLiveOnlyAudio] = useState(false);
-  const [liveAudioChunkCount, setLiveAudioChunkCount] = useState(0);
-  const [fallbackUseCount, setFallbackUseCount] = useState(0);
-  const [audioUnlocked, setAudioUnlocked] = useState(false);
-  const [audioState, setAudioState] = useState<string>("uninitialized");
   const activeSpeechUtteranceIdRef = useRef<string | null>(null);
   const analyzedSessionRef = useRef<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -86,7 +82,6 @@ function VerdictPageContent() {
     }
     audioContextRef.current = new AudioContextCtor({ sampleRate: sampleRateHz });
     queuedAudioEndTimeRef.current = audioContextRef.current.currentTime;
-    setAudioState(audioContextRef.current.state);
     return audioContextRef.current;
   }
 
@@ -100,8 +95,6 @@ function VerdictPageContent() {
     } catch {
       // no-op
     }
-    setAudioState(ctx.state);
-    setAudioUnlocked(ctx.state === "running");
   }
 
   function schedulePcmChunk(audioBase64: string, sampleRateHz: number) {
@@ -113,13 +106,7 @@ function VerdictPageContent() {
       return;
     }
     if (ctx.state === "suspended") {
-      void ctx.resume().then(() => {
-        setAudioState(ctx.state);
-        setAudioUnlocked(ctx.state === "running");
-      });
-    } else {
-      setAudioState(ctx.state);
-      setAudioUnlocked(ctx.state === "running");
+      void ctx.resume();
     }
 
     const binary = window.atob(audioBase64);
@@ -332,9 +319,6 @@ function VerdictPageContent() {
             const existing = prev[latest.payload.turnId];
             const fallbackText = existing?.transcript?.trim() || latest.payload.text;
             speakFallbackText(fallbackText);
-            if (!liveOnlyAudio) {
-              setFallbackUseCount((count) => count + 1);
-            }
             return prev;
           });
         }
@@ -369,7 +353,6 @@ function VerdictPageContent() {
           delete fallbackTimerByUtteranceRef.current[latest.payload.utteranceId];
         }
         browserTtsFallbackByUtteranceRef.current[latest.payload.utteranceId] = false;
-        setLiveAudioChunkCount((count) => count + 1);
         enqueueLiveAudioChunk(latest.payload.audioBase64, latest.payload.sampleRateHz);
       }
       return;
@@ -396,14 +379,14 @@ function VerdictPageContent() {
   const speakingTurn = [...orderedTurns].reverse().find((turn) => turn.state === "speaking" && turn.utteranceId);
 
   function interruptActiveSpeech() {
-    if (!speakingTurn || !speakingTurn.utteranceId) {
+    if (!speakingTurn?.utteranceId) {
       return;
     }
     sendUserInterrupt({
       turnId: speakingTurn.turnId,
       utteranceId: speakingTurn.utteranceId,
       intent: "challenge",
-      transcript: "User interrupted the current explanation.",
+      transcript: "User interrupted ongoing verdict explanation.",
     });
     stopAudioPlayback();
   }
@@ -417,9 +400,20 @@ function VerdictPageContent() {
           <p className="text-sm text-court-300">
             Session: {sessionId ?? "missing"} | WS: {isConnected ? "connected" : "offline"}
           </p>
-          <Link href="/" className="rounded-md border border-court-500 px-3 py-1.5 text-sm text-court-300 hover:bg-court-700/40">
-            Back to Upload
-          </Link>
+          <div className="flex items-center gap-2">
+            {speakingTurn ? (
+              <button
+                type="button"
+                onClick={interruptActiveSpeech}
+                className="rounded-md border border-whistle-500/60 px-3 py-1.5 text-sm text-whistle-300 hover:bg-whistle-500/10"
+              >
+                Interrupt
+              </button>
+            ) : null}
+            <Link href="/" className="rounded-md border border-court-500 px-3 py-1.5 text-sm text-court-300 hover:bg-court-700/40">
+              Back to Upload
+            </Link>
+          </div>
         </div>
 
         {!sessionId ? (
@@ -432,76 +426,6 @@ function VerdictPageContent() {
 
         <VerdictCard verdict={verdict} isProcessing={isProcessing} />
         <EvidenceTimeline evidence={verdict?.evidence ?? []} />
-        <section className="rounded-2xl border border-court-700 bg-court-900/60 p-4 shadow-panel">
-          <h2 className="text-lg font-semibold text-white">Live Controls</h2>
-          <p className="mt-2 text-sm text-court-300">Interrupts are user-driven and only apply to the current speaking turn.</p>
-          <p className="mt-2 text-xs text-court-400">
-            Live audio chunks: {liveAudioChunkCount} | Browser fallback uses: {fallbackUseCount}
-          </p>
-          <button
-            type="button"
-            className="mt-3 rounded-md border border-court-500 px-3 py-1.5 text-sm text-court-200 hover:bg-court-700/40"
-            onClick={() => setVoiceEnabled((prev) => !prev)}
-          >
-            Voice: {voiceEnabled ? "on" : "off"}
-          </button>
-          <button
-            type="button"
-            className="mt-3 ml-2 rounded-md border border-court-500 px-3 py-1.5 text-sm text-court-200 hover:bg-court-700/40"
-            onClick={() => {
-              void unlockAudio();
-            }}
-            disabled={!voiceEnabled}
-          >
-            Enable Audio
-          </button>
-          <button
-            type="button"
-            className="mt-3 ml-2 rounded-md border border-court-500 px-3 py-1.5 text-sm text-court-200 hover:bg-court-700/40"
-            onClick={testVoice}
-            disabled={!voiceEnabled}
-          >
-            Test Voice
-          </button>
-          <button
-            type="button"
-            className="mt-3 ml-2 rounded-md border border-court-500 px-3 py-1.5 text-sm text-court-200 hover:bg-court-700/40"
-            onClick={() => setLiveOnlyAudio((prev) => !prev)}
-            disabled={!voiceEnabled}
-          >
-            Live-only: {liveOnlyAudio ? "on" : "off"}
-          </button>
-          <p className="mt-2 text-xs text-court-400">
-            Audio unlocked: {audioUnlocked ? "yes" : "no"} | AudioContext: {audioState}
-          </p>
-          <button
-            type="button"
-            className="mt-3 ml-2 rounded-md border border-court-500 px-3 py-1.5 text-sm text-court-200 enabled:hover:bg-court-700/40 disabled:cursor-not-allowed disabled:opacity-40"
-            onClick={interruptActiveSpeech}
-            disabled={!speakingTurn}
-          >
-            Interrupt Active Speech
-          </button>
-        </section>
-        <section className="rounded-2xl border border-court-700 bg-court-900/60 p-4 shadow-panel">
-          <h2 className="text-lg font-semibold text-white">Turn Transcript</h2>
-          {orderedTurns.length === 0 ? (
-            <p className="mt-3 text-sm text-court-300">No turn events yet.</p>
-          ) : (
-            <div className="mt-4 space-y-3">
-              {orderedTurns.map((turn) => (
-                <article key={turn.turnId} className="rounded-lg border border-court-700 bg-court-950/40 p-3">
-                  <p className="text-sm text-court-200">
-                    {turn.turnId} | state: {turn.state}
-                    {turn.interrupted ? ` | interrupted (${turn.interruptionIntent ?? "other"})` : ""}
-                  </p>
-                  {turn.verdictSummary ? <p className="mt-1 text-sm text-court-300">Committed: {turn.verdictSummary}</p> : null}
-                  <p className="mt-2 text-sm text-court-100">{turn.transcript || "No speech chunks received yet."}</p>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
       </div>
     </main>
   );

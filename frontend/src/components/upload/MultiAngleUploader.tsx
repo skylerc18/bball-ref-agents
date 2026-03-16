@@ -10,6 +10,9 @@ type Props = {
 };
 
 function formatSize(sizeBytes: number): string {
+  if (sizeBytes <= 0) {
+    return "Built-in clip";
+  }
   const mb = sizeBytes / (1024 * 1024);
   return `${mb.toFixed(1)} MB`;
 }

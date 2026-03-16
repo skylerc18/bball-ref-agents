@@ -1,0 +1,100 @@
+[
+  {
+    "rule_number": 1,
+    "title": "Court Dimensions - Equipment",
+    "url": "https://official.nba.com/rule-no-1-court-dimensions-equipment/",
+    "topics": ["court", "boundaries", "equipment", "restricted_area"],
+    "summary": "Defines court lines, dimensions, basket/backboard setup, and required equipment markings."
+  },
+  {
+    "rule_number": 2,
+    "title": "Duties of the Officials",
+    "url": "https://official.nba.com/rule-no-2-duties-of-the-officials/",
+    "topics": ["officials", "authority", "mechanics"],
+    "summary": "Defines officials' authority, responsibilities, and procedural duties during game administration."
+  },
+  {
+    "rule_number": 3,
+    "title": "Players, Substitutes and Coaches",
+    "url": "https://official.nba.com/rule-no-3-players-substitutes-and-coaches/",
+    "topics": ["lineups", "substitutions", "bench", "eligibility"],
+    "summary": "Governs player participation, substitutions, bench conduct, and related team personnel rules."
+  },
+  {
+    "rule_number": 4,
+    "title": "Definitions",
+    "url": "https://official.nba.com/rule-no-4-definitions/",
+    "topics": ["definitions", "terminology", "legal_position", "team_control"],
+    "summary": "Provides official definitions used across all rules, including control, guarding position, and status states."
+  },
+  {
+    "rule_number": 5,
+    "title": "Scoring and Timing",
+    "url": "https://official.nba.com/rule-no-5-scoring-and-timing/",
+    "topics": ["clock", "periods", "timing", "scoring"],
+    "summary": "Covers game timing, period structure, scoring counts, and clock operation standards."
+  },
+  {
+    "rule_number": 6,
+    "title": "Putting Ball in Play - Live/Dead Ball",
+    "url": "https://official.nba.com/rule-no-6-putting-ball-in-play-live-dead-ball/",
+    "topics": ["live_ball", "dead_ball", "resumption", "throw_in_start"],
+    "summary": "Explains when the ball becomes live or dead and how play is legally resumed."
+  },
+  {
+    "rule_number": 7,
+    "title": "Shot Clock",
+    "url": "https://official.nba.com/rule-no-7-24-second-clock/",
+    "topics": ["shot_clock", "resets", "violations", "timing"],
+    "summary": "Defines 24-second clock operation, resets, and related violations and exceptions."
+  },
+  {
+    "rule_number": 8,
+    "title": "Out-of-Bounds and Throw-In",
+    "url": "https://official.nba.com/rule-no-8-out-of-bounds-and-throw-in/",
+    "topics": ["out_of_bounds", "last_touch", "throw_in", "possession"],
+    "summary": "Specifies when ball/player status is out of bounds and how throw-ins and possession are awarded."
+  },
+  {
+    "rule_number": 9,
+    "title": "Free Throws and Penalties",
+    "url": "https://official.nba.com/rule-no-9-free-throws-and-penalties/",
+    "topics": ["free_throw", "lane", "penalties", "administration"],
+    "summary": "Covers free throw administration, lane restrictions, and penalty enforcement."
+  },
+  {
+    "rule_number": 10,
+    "title": "Violations and Penalties",
+    "url": "https://official.nba.com/rule-no-10-violations-and-penalties/",
+    "topics": ["violations", "travel", "double_dribble", "backcourt", "kick_ball"],
+    "summary": "Defines non-foul infractions and corresponding penalties, including ball-handling and court violations."
+  },
+  {
+    "rule_number": 11,
+    "title": "Basket Interference - Goaltending",
+    "url": "https://official.nba.com/rule-no-11-basket-interference-goaltending/",
+    "topics": ["goaltending", "basket_interference", "scoring_status"],
+    "summary": "Defines legal/illegal contact with ball or basket in scoring situations."
+  },
+  {
+    "rule_number": 12,
+    "title": "Fouls and Penalties",
+    "url": "https://official.nba.com/rule-no-12-fouls-and-penalties/",
+    "topics": ["personal_foul", "shooting_foul", "offensive_foul", "away_from_play", "penalty"],
+    "summary": "Defines personal/technical/flagrant categories, illegal contact standards, and foul penalties."
+  },
+  {
+    "rule_number": 13,
+    "title": "Instant Replay",
+    "url": "https://official.nba.com/rule-no-13-instant-replay/",
+    "topics": ["replay", "reviewable_plays", "clear_and_conclusive", "procedures"],
+    "summary": "Lists reviewable matters, replay standards, and the process for confirming or overturning calls."
+  },
+  {
+    "rule_number": 14,
+    "title": "Coach's Challenge",
+    "url": "https://official.nba.com/rule-no-14-coachs-challenge/",
+    "topics": ["challenge", "trigger", "timeouts", "review_procedure"],
+    "summary": "Defines coach challenge eligibility, administration, and outcomes after review."
+  }
+]

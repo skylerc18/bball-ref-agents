@@ -15,6 +15,12 @@ function toAngle(index: number, file: File): CameraAngle {
   };
 }
 
+type RemoteAngleInput = {
+  id: string;
+  label: string;
+  srcUrl: string;
+};
+
 export function useClipUpload() {
   const [angles, setAngles] = useState<CameraAngle[]>([]);
 
@@ -33,9 +39,35 @@ export function useClipUpload() {
     });
   }, []);
 
+  const setFromRemote = useCallback((remoteAngles: RemoteAngleInput[]) => {
+    const next = remoteAngles.slice(0, MAX_VIDEO_ANGLES).map((angle, index) => {
+      const fileName = angle.srcUrl.split("/").at(-1) || `angle_${index + 1}.mp4`;
+      return {
+        id: angle.id || `angle-${index + 1}`,
+        label: angle.label || `Angle ${index + 1}`,
+        fileName,
+        fileSize: 0,
+        srcUrl: angle.srcUrl,
+      } satisfies CameraAngle;
+    });
+
+    setAngles((prev) => {
+      prev.forEach((angle) => {
+        if (angle.file) {
+          URL.revokeObjectURL(angle.srcUrl);
+        }
+      });
+      return next;
+    });
+  }, []);
+
   const clear = useCallback(() => {
     setAngles((prev) => {
-      prev.forEach((angle) => URL.revokeObjectURL(angle.srcUrl));
+      prev.forEach((angle) => {
+        if (angle.file) {
+          URL.revokeObjectURL(angle.srcUrl);
+        }
+      });
       return [];
     });
   }, []);
@@ -45,6 +77,7 @@ export function useClipUpload() {
   return {
     angles,
     setFromFiles,
+    setFromRemote,
     clear,
   };
 }

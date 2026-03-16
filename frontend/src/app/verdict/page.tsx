@@ -30,13 +30,144 @@ function VerdictPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [turns, setTurns] = useState<Record<string, TurnView>>({});
   const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [liveOnlyAudio, setLiveOnlyAudio] = useState(false);
+  const [liveAudioChunkCount, setLiveAudioChunkCount] = useState(0);
+  const [fallbackUseCount, setFallbackUseCount] = useState(0);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const [audioState, setAudioState] = useState<string>("uninitialized");
   const activeSpeechUtteranceIdRef = useRef<string | null>(null);
+  const analyzedSessionRef = useRef<string | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const queuedAudioEndTimeRef = useRef<number>(0);
+  const audioSourcesRef = useRef<AudioBufferSourceNode[]>([]);
+  const audioChunksByUtteranceRef = useRef<Record<string, number>>({});
+  const browserTtsFallbackByUtteranceRef = useRef<Record<string, boolean>>({});
+  const fallbackTimerByUtteranceRef = useRef<Record<string, number>>({});
   const { isConnected, messages, sendUserInterrupt } = useWebSocket(sessionId, Boolean(sessionId));
+
+  function stopAudioPlayback() {
+    for (const source of audioSourcesRef.current) {
+      try {
+        source.stop();
+      } catch {
+        // no-op
+      }
+      source.disconnect();
+    }
+    audioSourcesRef.current = [];
+    if (audioContextRef.current) {
+      queuedAudioEndTimeRef.current = audioContextRef.current.currentTime;
+    } else {
+      queuedAudioEndTimeRef.current = 0;
+    }
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+  }
+
+  function ensureAudioContext(sampleRateHz: number): AudioContext | null {
+    if (typeof window === "undefined") {
+      return null;
+    }
+    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+      return audioContextRef.current;
+    }
+    const AudioContextCtor = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextCtor) {
+      return null;
+    }
+    audioContextRef.current = new AudioContextCtor({ sampleRate: sampleRateHz });
+    queuedAudioEndTimeRef.current = audioContextRef.current.currentTime;
+    setAudioState(audioContextRef.current.state);
+    return audioContextRef.current;
+  }
+
+  async function unlockAudio(): Promise<void> {
+    const ctx = ensureAudioContext(24000);
+    if (!ctx) {
+      return;
+    }
+    try {
+      await ctx.resume();
+    } catch {
+      // no-op
+    }
+    setAudioState(ctx.state);
+    setAudioUnlocked(ctx.state === "running");
+  }
+
+  function playPcmChunk(audioBase64: string, sampleRateHz: number) {
+    if (!voiceEnabled || typeof window === "undefined") {
+      return;
+    }
+    const ctx = ensureAudioContext(sampleRateHz);
+    if (!ctx) {
+      return;
+    }
+    if (ctx.state === "suspended") {
+      void ctx.resume().then(() => {
+        setAudioState(ctx.state);
+        setAudioUnlocked(ctx.state === "running");
+      });
+    } else {
+      setAudioState(ctx.state);
+      setAudioUnlocked(ctx.state === "running");
+    }
+
+    const binary = window.atob(audioBase64);
+    const byteLength = binary.length;
+    if (byteLength < 2) {
+      return;
+    }
+
+    const bytes = new Uint8Array(byteLength);
+    for (let i = 0; i < byteLength; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const int16 = new Int16Array(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / 2));
+    const float32 = new Float32Array(int16.length);
+    for (let i = 0; i < int16.length; i += 1) {
+      float32[i] = int16[i] / 32768;
+    }
+
+    const audioBuffer = ctx.createBuffer(1, float32.length, sampleRateHz);
+    audioBuffer.copyToChannel(float32, 0);
+    const source = ctx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(ctx.destination);
+    source.onended = () => {
+      audioSourcesRef.current = audioSourcesRef.current.filter((node) => node !== source);
+      source.disconnect();
+    };
+    const startAt = Math.max(ctx.currentTime, queuedAudioEndTimeRef.current);
+    source.start(startAt);
+    queuedAudioEndTimeRef.current = startAt + audioBuffer.duration;
+    audioSourcesRef.current.push(source);
+  }
+
+  function speakFallbackText(text: string) {
+    if (!voiceEnabled || liveOnlyAudio || typeof window === "undefined" || !("speechSynthesis" in window)) {
+      return;
+    }
+    if (!text.trim()) {
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+    window.speechSynthesis.speak(utterance);
+  }
+
+  function testVoice() {
+    speakFallbackText("Crew chief audio is enabled.");
+  }
 
   useEffect(() => {
     return () => {
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
+      stopAudioPlayback();
+      if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+        void audioContextRef.current.close();
       }
     };
   }, []);
@@ -46,6 +177,10 @@ function VerdictPageContent() {
       return;
     }
     const resolvedSessionId = sessionId;
+    if (analyzedSessionRef.current === resolvedSessionId) {
+      return;
+    }
+    analyzedSessionRef.current = resolvedSessionId;
 
     let cancelled = false;
 
@@ -135,17 +270,42 @@ function VerdictPageContent() {
     }
 
     if (latest.type === "speech.start" || latest.type === "speech.chunk" || latest.type === "speech.end") {
-      if (voiceEnabled && typeof window !== "undefined" && "speechSynthesis" in window) {
-        if (latest.type === "speech.start") {
-          window.speechSynthesis.cancel();
-          activeSpeechUtteranceIdRef.current = latest.payload.utteranceId;
+      if (latest.type === "speech.start") {
+        stopAudioPlayback();
+        activeSpeechUtteranceIdRef.current = latest.payload.utteranceId;
+        audioChunksByUtteranceRef.current[latest.payload.utteranceId] = 0;
+        browserTtsFallbackByUtteranceRef.current[latest.payload.utteranceId] = false;
+        fallbackTimerByUtteranceRef.current[latest.payload.utteranceId] = window.setTimeout(() => {
+          const chunkCount = audioChunksByUtteranceRef.current[latest.payload.utteranceId] ?? 0;
+          if (chunkCount === 0) {
+            browserTtsFallbackByUtteranceRef.current[latest.payload.utteranceId] = true;
+          }
+        }, 4500);
+      }
+
+      if (
+        browserTtsFallbackByUtteranceRef.current[latest.payload.utteranceId] &&
+        activeSpeechUtteranceIdRef.current === latest.payload.utteranceId
+      ) {
+        speakFallbackText(latest.payload.text);
+      }
+
+      if (latest.type === "speech.end") {
+        const timerId = fallbackTimerByUtteranceRef.current[latest.payload.utteranceId];
+        if (timerId) {
+          window.clearTimeout(timerId);
+          delete fallbackTimerByUtteranceRef.current[latest.payload.utteranceId];
         }
-        if (activeSpeechUtteranceIdRef.current === latest.payload.utteranceId && latest.payload.text.trim()) {
-          const utterance = new SpeechSynthesisUtterance(latest.payload.text);
-          utterance.rate = 1;
-          utterance.pitch = 1;
-          utterance.volume = 1;
-          window.speechSynthesis.speak(utterance);
+        if (browserTtsFallbackByUtteranceRef.current[latest.payload.utteranceId]) {
+          setTurns((prev) => {
+            const existing = prev[latest.payload.turnId];
+            const fallbackText = existing?.transcript?.trim() || latest.payload.text;
+            speakFallbackText(fallbackText);
+            if (!liveOnlyAudio) {
+              setFallbackUseCount((count) => count + 1);
+            }
+            return prev;
+          });
         }
       }
 
@@ -168,10 +328,24 @@ function VerdictPageContent() {
       return;
     }
 
-    if (latest.type === "user.interrupted") {
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
+    if (latest.type === "speech.audio.chunk") {
+        if (activeSpeechUtteranceIdRef.current === latest.payload.utteranceId) {
+        audioChunksByUtteranceRef.current[latest.payload.utteranceId] =
+          (audioChunksByUtteranceRef.current[latest.payload.utteranceId] ?? 0) + 1;
+        const timerId = fallbackTimerByUtteranceRef.current[latest.payload.utteranceId];
+        if (timerId) {
+          window.clearTimeout(timerId);
+          delete fallbackTimerByUtteranceRef.current[latest.payload.utteranceId];
+        }
+        browserTtsFallbackByUtteranceRef.current[latest.payload.utteranceId] = false;
+        setLiveAudioChunkCount((count) => count + 1);
+        playPcmChunk(latest.payload.audioBase64, latest.payload.sampleRateHz);
       }
+      return;
+    }
+
+    if (latest.type === "user.interrupted") {
+      stopAudioPlayback();
       setTurns((prev) => ({
         ...prev,
         [latest.payload.turnId]: {
@@ -200,6 +374,7 @@ function VerdictPageContent() {
       intent: "challenge",
       transcript: "User interrupted the current explanation.",
     });
+    stopAudioPlayback();
   }
 
   return (
@@ -229,6 +404,9 @@ function VerdictPageContent() {
         <section className="rounded-2xl border border-court-700 bg-court-900/60 p-4 shadow-panel">
           <h2 className="text-lg font-semibold text-white">Live Controls</h2>
           <p className="mt-2 text-sm text-court-300">Interrupts are user-driven and only apply to the current speaking turn.</p>
+          <p className="mt-2 text-xs text-court-400">
+            Live audio chunks: {liveAudioChunkCount} | Browser fallback uses: {fallbackUseCount}
+          </p>
           <button
             type="button"
             className="mt-3 rounded-md border border-court-500 px-3 py-1.5 text-sm text-court-200 hover:bg-court-700/40"
@@ -236,6 +414,35 @@ function VerdictPageContent() {
           >
             Voice: {voiceEnabled ? "on" : "off"}
           </button>
+          <button
+            type="button"
+            className="mt-3 ml-2 rounded-md border border-court-500 px-3 py-1.5 text-sm text-court-200 hover:bg-court-700/40"
+            onClick={() => {
+              void unlockAudio();
+            }}
+            disabled={!voiceEnabled}
+          >
+            Enable Audio
+          </button>
+          <button
+            type="button"
+            className="mt-3 ml-2 rounded-md border border-court-500 px-3 py-1.5 text-sm text-court-200 hover:bg-court-700/40"
+            onClick={testVoice}
+            disabled={!voiceEnabled}
+          >
+            Test Voice
+          </button>
+          <button
+            type="button"
+            className="mt-3 ml-2 rounded-md border border-court-500 px-3 py-1.5 text-sm text-court-200 hover:bg-court-700/40"
+            onClick={() => setLiveOnlyAudio((prev) => !prev)}
+            disabled={!voiceEnabled}
+          >
+            Live-only: {liveOnlyAudio ? "on" : "off"}
+          </button>
+          <p className="mt-2 text-xs text-court-400">
+            Audio unlocked: {audioUnlocked ? "yes" : "no"} | AudioContext: {audioState}
+          </p>
           <button
             type="button"
             className="mt-3 ml-2 rounded-md border border-court-500 px-3 py-1.5 text-sm text-court-200 enabled:hover:bg-court-700/40 disabled:cursor-not-allowed disabled:opacity-40"

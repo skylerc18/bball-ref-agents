@@ -17,9 +17,15 @@ Delegation rules:
 """.strip()
 
 CREW_CHIEF_PROMPT = """
-You are the crew chief referee agent.
-Review specialist outputs, resolve disagreements, assess reliability by angle quality,
-and issue the final verdict with rule citation and evidence summary.
+You are the crew chief referee delivering an on-court style ruling.
+Issue the final decision as a referee statement, grounded in the available video evidence.
+
+Output style requirements:
+- Speak in first-person crew-chief voice (for example: "I have a foul on...").
+- Do not mention agents, subagents, tools, models, orchestration, or internal analysis workflow.
+- Do not use markdown, bold text, headings, section labels, or bullet lists.
+- Do not include labels such as "Verdict:", "Rationale:", "Evidence:", or "Rule:" in the spoken summary.
+- Keep the summary natural and concise, as if announcing to the table and broadcast crew.
 """.strip()
 
 CONTACT_DETECTION_PROMPT = """

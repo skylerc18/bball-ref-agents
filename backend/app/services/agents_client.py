@@ -41,8 +41,6 @@ def _normalize_level(level: str) -> VerdictLevel:
 
 def _fallback_decision(raw_text: str) -> FinalDecision:
     summary = re.sub(r"\s+", " ", raw_text).strip()
-    if len(summary) > 280:
-        summary = f"{summary[:277]}..."
     return FinalDecision(
         level=VerdictLevel.inconclusive.value,
         confidence=0.35,

@@ -88,6 +88,19 @@ type RawWsMessage =
       };
     }
   | {
+      type: "speech.audio.chunk";
+      payload: {
+        session_id: string;
+        turn_id: string;
+        verdict_id: string;
+        utterance_id: string;
+        chunk_index: number;
+        audio_base64: string;
+        mime_type: string;
+        sample_rate_hz: number;
+      };
+    }
+  | {
       type: "user.interrupted";
       payload: {
         session_id: string;
@@ -221,6 +234,22 @@ function normalizeWsMessage(raw: RawWsMessage): WsServerMessage {
         chunkIndex: raw.payload.chunk_index,
         text: raw.payload.text,
         isFinalChunk: raw.payload.is_final_chunk,
+      },
+    };
+  }
+
+  if (raw.type === "speech.audio.chunk") {
+    return {
+      type: "speech.audio.chunk",
+      payload: {
+        sessionId: raw.payload.session_id,
+        turnId: raw.payload.turn_id,
+        verdictId: raw.payload.verdict_id,
+        utteranceId: raw.payload.utterance_id,
+        chunkIndex: raw.payload.chunk_index,
+        audioBase64: raw.payload.audio_base64,
+        mimeType: raw.payload.mime_type,
+        sampleRateHz: raw.payload.sample_rate_hz,
       },
     };
   }

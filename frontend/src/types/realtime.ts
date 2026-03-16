@@ -64,6 +64,17 @@ export type SpeechChunkPayload = {
   isFinalChunk: boolean;
 };
 
+export type SpeechAudioChunkPayload = {
+  sessionId: string;
+  turnId: string;
+  verdictId: string;
+  utteranceId: string;
+  chunkIndex: number;
+  audioBase64: string;
+  mimeType: string;
+  sampleRateHz: number;
+};
+
 export type UserInterruptionPayload = {
   sessionId: string;
   turnId: string;
@@ -82,4 +93,5 @@ export type RealtimeServerMessage =
   | { type: "speech.start"; payload: SpeechChunkPayload }
   | { type: "speech.chunk"; payload: SpeechChunkPayload }
   | { type: "speech.end"; payload: SpeechChunkPayload }
+  | { type: "speech.audio.chunk"; payload: SpeechAudioChunkPayload }
   | { type: "user.interrupted"; payload: UserInterruptionPayload };

@@ -83,6 +83,17 @@ class SpeechChunkPayload(BaseModel):
     is_final_chunk: bool
 
 
+class SpeechAudioChunkPayload(BaseModel):
+    session_id: str
+    turn_id: str
+    verdict_id: str
+    utterance_id: str
+    chunk_index: int = Field(ge=0)
+    audio_base64: str
+    mime_type: str = "audio/pcm;rate=24000"
+    sample_rate_hz: int = 24000
+
+
 class UserInterruptionPayload(BaseModel):
     session_id: str
     turn_id: str
@@ -141,6 +152,11 @@ class SpeechEndMessage(BaseModel):
     payload: SpeechChunkPayload
 
 
+class SpeechAudioChunkMessage(BaseModel):
+    type: Literal["speech.audio.chunk"]
+    payload: SpeechAudioChunkPayload
+
+
 class UserInterruptedMessage(BaseModel):
     type: Literal["user.interrupted"]
     payload: UserInterruptionPayload
@@ -154,5 +170,6 @@ RealtimeMessage = Union[
     SpeechStartMessage,
     SpeechChunkMessage,
     SpeechEndMessage,
+    SpeechAudioChunkMessage,
     UserInterruptedMessage,
 ]

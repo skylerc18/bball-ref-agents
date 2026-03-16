@@ -70,6 +70,7 @@ class CommittedVerdictPayload(BaseModel):
     claim: VerdictClaim
     rationale_points: list[str] = Field(default_factory=list)
     evidence_refs: list[EvidenceRef] = Field(default_factory=list)
+    voice_brief: str | None = None
     committed_at: str
 
 

@@ -72,6 +72,7 @@ type RawWsMessage =
           clip_start_sec?: number;
           clip_end_sec?: number;
         }>;
+        voice_brief?: string;
         committed_at: string;
       };
     }
@@ -218,6 +219,7 @@ function normalizeWsMessage(raw: RawWsMessage): WsServerMessage {
         },
         rationalePoints: raw.payload.rationale_points,
         evidenceRefs: raw.payload.evidence_refs.map(mapEvidenceRef),
+        voiceBrief: raw.payload.voice_brief,
         committedAt: raw.payload.committed_at,
       },
     };

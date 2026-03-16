@@ -51,6 +51,7 @@ export type CommittedVerdictPayload = {
   claim: VerdictClaim;
   rationalePoints: string[];
   evidenceRefs: EvidenceRef[];
+  voiceBrief?: string;
   committedAt: string;
 };
 

@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from app.schemas.session import AngleMetadata
-from app.schemas.verdict import AnalyzeSessionResponse, Verdict, VerdictLevel
+from app.schemas.verdict import AnalyzeSessionResponse, EvidenceItem, Verdict, VerdictLevel
 
 AGENTS_ROOT = Path(__file__).resolve().parents[3] / "agents"
 if str(AGENTS_ROOT) not in sys.path:
@@ -48,6 +48,69 @@ def _fallback_decision(raw_text: str) -> FinalDecision:
         summary=summary or "Agent response was not in the expected structured format.",
         rationale=[],
     )
+
+
+def _parse_timestamp_seconds(text: str) -> float | None:
+    sec_match = re.search(r"(\d+(?:\.\d+)?)\s*s(?:ec(?:onds?)?)?\b", text, flags=re.IGNORECASE)
+    if sec_match:
+        return float(sec_match.group(1))
+    mmss_match = re.search(r"\b(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\b", text)
+    if mmss_match:
+        minutes = int(mmss_match.group(1))
+        seconds = int(mmss_match.group(2))
+        fraction = float(f"0.{mmss_match.group(3)}") if mmss_match.group(3) else 0.0
+        return minutes * 60 + seconds + fraction
+    return None
+
+
+def _extract_evidence_items(decision: FinalDecision, angles: list[AngleMetadata]) -> list[EvidenceItem]:
+    angle_by_id = {angle.id.lower(): angle for angle in angles}
+    angle_by_label = {angle.label.lower(): angle for angle in angles}
+    evidence: list[EvidenceItem] = []
+
+    for idx, rationale in enumerate(decision.rationale, start=1):
+        text = rationale.strip()
+        if not text:
+            continue
+
+        angle_id = angles[0].id if angles else "angle-1"
+        lowered = text.lower()
+        for known_id, angle in angle_by_id.items():
+            if known_id in lowered:
+                angle_id = angle.id
+                break
+        else:
+            for known_label, angle in angle_by_label.items():
+                if known_label in lowered:
+                    angle_id = angle.id
+                    break
+
+        timestamp_sec = _parse_timestamp_seconds(text) or 0.0
+        evidence.append(
+            EvidenceItem(
+                id=f"e_{idx}",
+                angle_id=angle_id,
+                timestamp_sec=timestamp_sec,
+                confidence=decision.confidence,
+                reason=text,
+            )
+        )
+
+    if evidence:
+        return evidence
+
+    if decision.summary.strip():
+        return [
+            EvidenceItem(
+                id="e_1",
+                angle_id=angles[0].id if angles else "angle-1",
+                timestamp_sec=_parse_timestamp_seconds(decision.summary) or 0.0,
+                confidence=decision.confidence,
+                reason=decision.summary.strip(),
+            )
+        ]
+
+    return []
 
 
 def _is_retryable_model_error(exc: Exception) -> bool:
@@ -192,6 +255,6 @@ class AgentsClient:
             confidence=decision.confidence,
             summary=decision.summary,
             rule_reference=decision.rule_reference,
-            evidence=[],
+            evidence=_extract_evidence_items(decision=decision, angles=angles),
         )
         return AnalyzeSessionResponse(session_id=session_id, verdict=verdict)

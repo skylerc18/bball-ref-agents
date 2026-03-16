@@ -21,6 +21,8 @@ type TurnView = {
   verdictSummary?: string;
 };
 
+const PREBUFFER_SECONDS = 0.45;
+
 function VerdictPageContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("sessionId");
@@ -40,6 +42,9 @@ function VerdictPageContent() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const queuedAudioEndTimeRef = useRef<number>(0);
   const audioSourcesRef = useRef<AudioBufferSourceNode[]>([]);
+  const pendingAudioChunksRef = useRef<Array<{ audioBase64: string; sampleRateHz: number }>>([]);
+  const pendingAudioSecondsRef = useRef(0);
+  const hasStartedPlaybackRef = useRef(false);
   const audioChunksByUtteranceRef = useRef<Record<string, number>>({});
   const browserTtsFallbackByUtteranceRef = useRef<Record<string, boolean>>({});
   const fallbackTimerByUtteranceRef = useRef<Record<string, number>>({});
@@ -60,6 +65,9 @@ function VerdictPageContent() {
     } else {
       queuedAudioEndTimeRef.current = 0;
     }
+    pendingAudioChunksRef.current = [];
+    pendingAudioSecondsRef.current = 0;
+    hasStartedPlaybackRef.current = false;
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
@@ -96,7 +104,7 @@ function VerdictPageContent() {
     setAudioUnlocked(ctx.state === "running");
   }
 
-  function playPcmChunk(audioBase64: string, sampleRateHz: number) {
+  function schedulePcmChunk(audioBase64: string, sampleRateHz: number) {
     if (!voiceEnabled || typeof window === "undefined") {
       return;
     }
@@ -143,6 +151,29 @@ function VerdictPageContent() {
     source.start(startAt);
     queuedAudioEndTimeRef.current = startAt + audioBuffer.duration;
     audioSourcesRef.current.push(source);
+  }
+
+  function enqueueLiveAudioChunk(audioBase64: string, sampleRateHz: number) {
+    const binaryLength = typeof window !== "undefined" ? window.atob(audioBase64).length : 0;
+    const chunkDurationSec = binaryLength / (2 * sampleRateHz);
+    pendingAudioChunksRef.current.push({ audioBase64, sampleRateHz });
+    pendingAudioSecondsRef.current += chunkDurationSec;
+
+    if (!hasStartedPlaybackRef.current) {
+      if (pendingAudioSecondsRef.current < PREBUFFER_SECONDS) {
+        return;
+      }
+      hasStartedPlaybackRef.current = true;
+    }
+
+    while (pendingAudioChunksRef.current.length > 0) {
+      const next = pendingAudioChunksRef.current.shift();
+      if (!next) {
+        break;
+      }
+      schedulePcmChunk(next.audioBase64, next.sampleRateHz);
+    }
+    pendingAudioSecondsRef.current = 0;
   }
 
   function speakFallbackText(text: string) {
@@ -329,7 +360,7 @@ function VerdictPageContent() {
     }
 
     if (latest.type === "speech.audio.chunk") {
-        if (activeSpeechUtteranceIdRef.current === latest.payload.utteranceId) {
+      if (activeSpeechUtteranceIdRef.current === latest.payload.utteranceId) {
         audioChunksByUtteranceRef.current[latest.payload.utteranceId] =
           (audioChunksByUtteranceRef.current[latest.payload.utteranceId] ?? 0) + 1;
         const timerId = fallbackTimerByUtteranceRef.current[latest.payload.utteranceId];
@@ -339,7 +370,7 @@ function VerdictPageContent() {
         }
         browserTtsFallbackByUtteranceRef.current[latest.payload.utteranceId] = false;
         setLiveAudioChunkCount((count) => count + 1);
-        playPcmChunk(latest.payload.audioBase64, latest.payload.sampleRateHz);
+        enqueueLiveAudioChunk(latest.payload.audioBase64, latest.payload.sampleRateHz);
       }
       return;
     }

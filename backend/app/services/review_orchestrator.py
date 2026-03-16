@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import logging
+import re
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -9,12 +10,15 @@ from google.genai import types
 
 from app.db.repositories.session_repo import SessionRepository
 from app.schemas.session import SessionStatus
-from app.schemas.verdict import AnalyzeSessionResponse
+from app.schemas.verdict import AnalyzeSessionResponse, Verdict
 from app.services.agents_client import AgentsClient
 from app.services.speech_stream import SpeechStreamManager
 from app.ws.manager import ConnectionManager
 
 logger = logging.getLogger("uvicorn.error")
+PCM_SAMPLE_RATE_HZ = 24000
+PCM_BYTES_PER_SAMPLE = 2
+TARGET_AUDIO_CHUNK_MS = 240
 
 
 class ReviewOrchestrator:
@@ -48,6 +52,51 @@ class ReviewOrchestrator:
                 "payload": payload,
             },
         )
+
+    def _build_voice_brief(self, verdict: Verdict) -> str:
+        level_phrase = {
+            "upheld": "I am upholding the call on the floor",
+            "overruled": "I am overturning the call on the floor",
+            "inconclusive": "I do not have enough visual evidence to change the call",
+        }.get(verdict.level.value, "I am issuing the ruling based on the available video")
+
+        evidence_lines: list[str] = []
+        for item in verdict.evidence[:3]:
+            evidence_lines.append(
+                f"On {item.angle_id} at {item.timestamp_sec:.2f} seconds, "
+                f"{item.reason.strip().rstrip('.')}."
+            )
+
+        evidence_text = " ".join(evidence_lines) if evidence_lines else ""
+        confidence_text = f"My confidence on this ruling is {verdict.confidence * 100:.0f} percent."
+        rule_text = f"The applicable rule reference is {verdict.rule_reference}."
+
+        return re.sub(
+            r"\s+",
+            " ",
+            f"{level_phrase}. {verdict.summary} {evidence_text} {rule_text} {confidence_text}",
+        ).strip()
+
+    def _voice_brief_is_consistent(self, verdict: Verdict, voice_brief: str) -> bool:
+        lowered = voice_brief.lower()
+        opposite_markers = {
+            "upheld": ("overturn", "overruled"),
+            "overruled": ("uphold", "upheld"),
+            "inconclusive": ("uphold", "overturn", "overruled", "upheld"),
+        }
+        required_markers = {
+            "upheld": ("uphold", "upheld"),
+            "overruled": ("overturn", "overruled"),
+            "inconclusive": ("not enough", "inconclusive", "insufficient"),
+        }
+
+        if any(marker in lowered for marker in opposite_markers.get(verdict.level.value, ())):
+            return False
+        if not any(marker in lowered for marker in required_markers.get(verdict.level.value, ())):
+            return False
+        if verdict.rule_reference and verdict.rule_reference.lower() not in lowered:
+            return False
+        return True
 
     async def _emit_speech(
         self,
@@ -91,6 +140,39 @@ class ReviewOrchestrator:
                     ) as live_session:
                         await live_session.send_realtime_input(text=spoken_text)
                         chunk_index = 0
+                        target_chunk_bytes = int(
+                            PCM_SAMPLE_RATE_HZ
+                            * PCM_BYTES_PER_SAMPLE
+                            * (TARGET_AUDIO_CHUNK_MS / 1000.0)
+                        )
+                        pending_audio = bytearray()
+
+                        async def flush_pending_audio() -> None:
+                            nonlocal chunk_index, pending_audio
+                            if not pending_audio:
+                                return
+                            audio_b64 = base64.b64encode(bytes(pending_audio)).decode("utf-8")
+                            await self._ws_manager.broadcast(
+                                session_id,
+                                {
+                                    "type": "speech.audio.chunk",
+                                    "payload": {
+                                        "session_id": session_id,
+                                        "turn_id": turn_id,
+                                        "verdict_id": verdict_id,
+                                        "utterance_id": utterance_id,
+                                        "chunk_index": chunk_index,
+                                        "audio_base64": audio_b64,
+                                        "mime_type": "audio/pcm;rate=24000",
+                                        "sample_rate_hz": 24000,
+                                    },
+                                },
+                            )
+                            if chunk_index == 0:
+                                logger.info("Gemini Live first audio chunk received (model=%s)", model_name)
+                            chunk_index += 1
+                            pending_audio = bytearray()
+
                         async for response in live_session.receive():
                             server_content = getattr(response, "server_content", None)
                             model_turn = getattr(server_content, "model_turn", None) if server_content else None
@@ -103,32 +185,20 @@ class ReviewOrchestrator:
                                     if not data:
                                         continue
                                     if isinstance(data, str):
-                                        audio_b64 = data
+                                        try:
+                                            audio_bytes = base64.b64decode(data)
+                                        except Exception:
+                                            audio_bytes = data.encode("latin1", errors="ignore")
                                     else:
-                                        audio_b64 = base64.b64encode(data).decode("utf-8")
-                                    if chunk_index == 0:
-                                        logger.info("Gemini Live first audio chunk received (model=%s)", model_name)
-                                    await self._ws_manager.broadcast(
-                                        session_id,
-                                        {
-                                            "type": "speech.audio.chunk",
-                                            "payload": {
-                                                "session_id": session_id,
-                                                "turn_id": turn_id,
-                                                "verdict_id": verdict_id,
-                                                "utterance_id": utterance_id,
-                                                "chunk_index": chunk_index,
-                                                "audio_base64": audio_b64,
-                                                "mime_type": "audio/pcm;rate=24000",
-                                                "sample_rate_hz": 24000,
-                                            },
-                                        },
-                                    )
-                                    chunk_index += 1
+                                        audio_bytes = data
+                                    pending_audio.extend(audio_bytes)
+                                    if len(pending_audio) >= target_chunk_bytes:
+                                        await flush_pending_audio()
 
                             if server_content and getattr(server_content, "turn_complete", False):
                                 break
 
+                        await flush_pending_audio()
                         if chunk_index > 0:
                             logger.info("Gemini Live emitted %d audio chunk(s) (model=%s)", chunk_index, model_name)
                             return
@@ -286,12 +356,13 @@ class ReviewOrchestrator:
             {"angle_id": item.angle_id, "timestamp_sec": item.timestamp_sec}
             for item in result.verdict.evidence
         ]
-        spoken_text = (
-            f"Verdict: {result.verdict.level.value}. "
-            f"{result.verdict.summary} "
-            f"Rule reference: {result.verdict.rule_reference}. "
-            f"Confidence: {result.verdict.confidence * 100:.0f} percent."
-        )
+        voice_brief = self._build_voice_brief(result.verdict)
+        if not self._voice_brief_is_consistent(result.verdict, voice_brief):
+            voice_brief = (
+                f"I am issuing an {result.verdict.level.value} ruling. {result.verdict.summary} "
+                f"The applicable rule reference is {result.verdict.rule_reference}. "
+                f"My confidence is {result.verdict.confidence * 100:.0f} percent."
+            )
 
         await self._ws_manager.broadcast(
             session_id,
@@ -309,6 +380,7 @@ class ReviewOrchestrator:
                     },
                     "rationale_points": rationale_points,
                     "evidence_refs": evidence_refs,
+                    "voice_brief": voice_brief,
                     "committed_at": committed_at,
                 },
             },
@@ -320,7 +392,7 @@ class ReviewOrchestrator:
             session_id=session_id,
             turn_id=turn_id,
             verdict_id=verdict_id,
-            spoken_text=spoken_text,
+            spoken_text=voice_brief,
         )
         turn_state = self._repo.get_turn_state(session_id=session_id, turn_id=turn_id)
 

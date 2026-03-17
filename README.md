@@ -25,6 +25,14 @@ gcloud run services update bball-ai-ref-agents \
 
 For local backend development, copy values from `backend/.env.example`.
 
+## High-Level Architecture
+
+![High-Level Architecture](docs/architecture-diagram.png)
+
+## Clip Analysis Path
+
+![Clip Analysis Path](docs/clip-analysis-path.png)
+
 ## Helpful Links
 
 - [AI Basketball Ref MVP](https://bball-ai-ref-frontend-794727813456.europe-west1.run.app)
